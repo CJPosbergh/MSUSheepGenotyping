@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Batches · MSU Sheep Genotyping staff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 24px; align-items: start; }
+  .pick { display: grid; grid-template-columns: 24px minmax(0, 1fr) 60px 110px; gap: 12px; padding: 14px 24px; border-top: 1px solid var(--line2); align-items: center; cursor: pointer; }
+  .pick input { width: 20px; height: 20px; accent-color: var(--primary); }
+  .pick.off { cursor: default; opacity: .75; }
+  .pick-head { cursor: default; background: var(--head); font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--label); border-top: none; padding: 10px 24px; }
+  .tag { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .tag-sub { background: var(--good-bg); color: var(--good); }
+  .tag-rep { background: #E6E0F5; color: #3E2C7A; }
+  .tag-hold { background: var(--warn-bg); color: var(--mid); }
+  .hist { display: grid; grid-template-columns: 100px 110px 1fr 110px 70px 110px 210px; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--line2); align-items: center; font-size: 14px; }
+  .hist.h { background: var(--head); font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--label); border-top: none; }
+  .hist .linkbtn { white-space: nowrap; font-size: 13px; }
+  .st-build { background: var(--warn-bg); color: var(--mid); }
+  .st-ship { background: var(--good-bg); color: var(--good); }
+  .st-done { background: #DDEFE3; color: #1D5A33; }
+  .st-cancel { background: var(--none-bg); color: var(--none); }
+  .prev { display: grid; grid-template-columns: 1.4fr 1.4fr .6fr 1fr .4fr 1fr; gap: 6px; font-size: 11px; padding: 4px 8px; border-top: 1px solid var(--line2); }
+  .prev.h { background: var(--head); font-weight: 700; color: var(--label); border-top: none; }
+  @media (max-width: 1000px) {
+    .two { grid-template-columns: minmax(0, 1fr); }
+    .hist { grid-template-columns: 100px 100px 1fr; }
+    .hist .opt { display: none; }
+    .pick { padding: 12px 16px; grid-template-columns: 24px minmax(0, 1fr) 44px; }
+    .pick .opt { display: none; }
+  }
+</style>
+</head>
+<body>
+<header id="site-header"></header>
+<main class="page">
+  <div id="gate" class="hidden"></div>
+  <div id="app" class="hidden stack" style="gap:24px">
+    <div class="stack-s">
+      <h1 style="font-size:36px">Batches</h1>
+      <span style="color:var(--ink2)">Pick the received samples going to GenomNZ, download their file, then mark the batch shipped when the box goes out.</span>
+    </div>
+    <div id="page-msg" class="hidden"></div>
+
+    <div class="two">
+      <section class="card" aria-label="Ready to ship">
+        <div class="section row" style="justify-content:space-between">
+          <h2>Ready to ship</h2><span class="small muted">Received, signed and not in a batch yet</span>
+        </div>
+        <div class="pick pick-head"><span></span><span>Submission</span><span>TSUs</span><span class="opt">Received</span></div>
+        <div id="groups"><div class="section muted">Loading…</div></div>
+      </section>
+
+      <div class="stack">
+        <section id="new-pane" class="card pad stack" aria-label="New batch">
+          <h2>New batch</h2>
+          <span id="sel"></span>
+          <button type="button" class="btn btn-primary" id="create" disabled>Create batch and download GenomNZ file</button>
+          <span class="small muted">The file fills GenomNZ's animal sheet: Birth Flock (<span id="bf">Montana State University</span>), Birth Tag (our Animal_Key), YOB, Breed, Sex and TSU barcode. Everything else is left blank.</span>
+          <div id="create-err" class="hidden"></div>
+        </section>
+
+        <section id="made-pane" class="card pad stack hidden" aria-label="Batch">
+          <h2 id="made-title"></h2>
+          <div class="panel row" style="flex-wrap:nowrap">
+            <div class="stack-s" style="flex:1"><span class="mono small" id="file-name"></span><span class="small muted" id="file-note"></span></div>
+            <button type="button" class="btn btn-ghost btn-sm" id="again">Download again</button>
+          </div>
+          <div style="border:1px solid var(--line);border-radius:8px;overflow:hidden" id="preview"></div>
+          <div class="stack-s"><label class="lbl" for="shipdate">Ship date</label><input id="shipdate" class="field" type="date" style="max-width:220px"></div>
+          <button type="button" class="btn btn-primary" id="ship">Mark as shipped</button>
+          <span class="small muted">Until then the samples stay in this batch but don't show as At lab. Shipping emails each producer that their samples are at the lab.</span>
+          <button type="button" class="linkbtn" id="cancel">Cancel this batch</button>
+          <div id="made-err" class="hidden"></div>
+        </section>
+
+        <section id="shipped-pane" class="card pad stack hidden" aria-label="Batch shipped">
+          <h2 id="shipped-title"></h2>
+          <ul id="shipped-list" style="margin:0;padding-left:18px" class="stack-s"></ul>
+          <button type="button" class="btn btn-ghost" id="restart">Start another batch</button>
+        </section>
+      </div>
+    </div>
+
+    <section class="card" aria-label="All batches">
+      <div class="section"><h2>All batches</h2></div>
+      <div class="hist h"><span>Batch</span><span>Status</span><span class="opt">Created by</span><span class="opt">Shipped</span><span class="opt">Samples</span><span class="opt">Results in</span><span class="opt">GenomNZ file</span></div>
+      <div id="history"></div>
+    </section>
+  </div>
+</main>
+<footer id="site-footer"></footer>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/vendor/exceljs.min.js"></script>
+<script src="../assets/js/genomnz_export.js"></script>
+<script src="../assets/js/staff.js"></script>
+<script src="../assets/js/batches.js"></script>
+</body>
+</html>

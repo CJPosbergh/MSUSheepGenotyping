@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<style>
+  body { font-family: Arial, sans-serif; color: #16233A; margin: 0; padding: 4px 6px; font-size: 13px; }
+  label { display: block; font-weight: bold; margin: 10px 0 4px; font-size: 12px; color: #4A5566; text-transform: uppercase; letter-spacing: .4px; }
+  input, textarea { width: 100%; box-sizing: border-box; border: 1px solid #B9B2A2; border-radius: 6px; padding: 8px; font: 14px Arial, sans-serif; color: #16233A; }
+  textarea { height: 330px; line-height: 1.45; resize: vertical; }
+  .to { font-size: 14px; }
+  .note { background: #FCF1D8; color: #6B4A07; border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+  .att { color: #5A6474; font-size: 12px; margin-top: 6px; }
+  .row { display: flex; gap: 8px; margin-top: 14px; }
+  button { height: 36px; padding: 0 16px; border-radius: 6px; font: bold 14px Arial, sans-serif; cursor: pointer; }
+  .primary { background: #1F3A5F; color: #fff; border: 1px solid #1F3A5F; }
+  .ghost { background: #fff; color: #1F3A5F; border: 1px solid #B9B2A2; }
+  #msg { margin-top: 10px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <label>To</label>
+  <div class="to" id="to"></div>
+  <div class="note" id="note" style="display:none"></div>
+  <label for="subject">Subject</label>
+  <input id="subject">
+  <label for="body">Message</label>
+  <textarea id="body"></textarea>
+  <div class="att" id="att"></div>
+  <div class="row">
+    <button class="primary" id="send">Send</button>
+    <button class="ghost" id="releaseOnly" style="display:none">Release without emailing</button>
+    <button class="ghost" onclick="google.script.host.close()">Cancel</button>
+  </div>
+  <div id="msg"></div>
+<script>
+  var D = <?!= data ?>;
+  document.getElementById('to').textContent = D.to;
+  document.getElementById('subject').value = D.subject;
+  document.getElementById('body').value = D.body;
+  if (D.note) { var n = document.getElementById('note'); n.textContent = D.note; n.style.display = 'block'; }
+  if (D.attachments.length) document.getElementById('att').textContent = 'Attached: ' + D.attachments.join(', ');
+  if (D.kind === 'release') document.getElementById('releaseOnly').style.display = 'inline-block';
+  function busy(on) { ['send', 'releaseOnly'].forEach(function (id) { document.getElementById(id).disabled = on; }); }
+  function done(text) { document.getElementById('msg').textContent = text; setTimeout(function () { google.script.host.close(); }, 1500); }
+  function fail(e) { busy(false); document.getElementById('msg').textContent = 'Not sent: ' + (e && e.message || e); }
+  document.getElementById('send').onclick = function () {
+    busy(true); document.getElementById('msg').textContent = 'Sending…';
+    google.script.run.withSuccessHandler(done).withFailureHandler(fail)
+      .reviewSend(D.kind, D.id, document.getElementById('subject').value, document.getElementById('body').value);
+  };
+  document.getElementById('releaseOnly').onclick = function () {
+    busy(true);
+    google.script.run.withSuccessHandler(done).withFailureHandler(fail).reviewReleaseOnly(D.id);
+  };
+</script>
+</body>
+</html>

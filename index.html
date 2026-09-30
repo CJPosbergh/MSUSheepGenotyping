@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Submit samples · MSU Sheep Genotyping</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+  .animal-grid { grid-template-columns: 70px 150px 118px 44px 90px minmax(0,1fr) 150px; }
+  .photo-count { font-size: 13px; font-weight: 600; }
+  .consent-q { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .consent-q .choices { flex-shrink: 0; }
+  .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 900px) {
+    .animal-grid { grid-template-columns: 60px 1fr 110px; }
+    .animal-grid .opt { display: none; }
+    .consent-q { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .summary { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header id="site-header"></header>
+<main class="page">
+  <div class="stack-s">
+    <span class="eyebrow">MSU Sheep Genotyping</span>
+    <h1>Submit samples for genotyping</h1>
+    <p class="lead">Fill in the Excel submission form, upload it here, sign, and we'll email you a packing slip and a private link to follow your samples and see your results.</p>
+    <div class="pill-steps" id="pills" aria-label="Progress"><span>1 Choose form</span><span>2 Check</span><span>3 Sign and submit</span><span>4 Send TSUs</span></div>
+  </div>
+
+  <div class="grid-main">
+    <div class="stack" style="gap:20px">
+
+      <!-- 1. choose -->
+      <section class="card pad stack" id="choose">
+        <h2>Your submission form</h2>
+        <p class="small muted">Don't have the form yet? <a id="blank-form" href="#" target="_blank" rel="noopener">Download the blank Excel submission form</a>, fill in the Submitter and Animals tabs, and save it.</p>
+        <label class="drop" id="drop" for="file">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1F3A5F" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
+          <b>Drag your filled-in form here, or choose the file</b>
+          <span class="small muted">Excel file (.xlsx). It's checked in your browser first and only sent when you press Submit.</span>
+          <input id="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr">
+        </label>
+        <div id="read-msg" class="hidden"></div>
+      </section>
+
+      <!-- 2. check -->
+      <section class="card hidden" id="review">
+        <div class="section stack">
+          <div class="row" style="justify-content:space-between">
+            <h2 id="file-name">Form</h2>
+            <label class="linkbtn" for="file" style="text-decoration:underline">Choose a different file</label>
+          </div>
+          <div class="summary">
+            <div class="stack-s"><span class="small muted">Flock</span><b id="sum-flock"></b><span class="small muted" id="sum-contact"></span></div>
+            <div class="stack-s"><span class="small muted">Animals</span><b id="sum-animals"></b><span class="small muted" id="sum-nsip"></span></div>
+            <div class="stack-s"><span class="small muted">Test</span><b>Genotyping with conditions and parentage</b><span class="small muted" id="sum-email"></span></div>
+          </div>
+          <div id="errors" class="hidden"></div>
+          <div id="warnings" class="hidden"></div>
+        </div>
+
+        <div class="section" style="padding-bottom:6px">
+          <h3 style="margin-bottom:8px">Animals on this form</h3>
+          <div class="tbl-head animal-grid" style="padding:10px 0;background:none"><span>Tag</span><span class="opt">EID</span><span>TSU</span><span class="opt">Sex</span><span class="opt">Born</span><span class="opt">Breed</span><span class="opt" id="photo-col">Photos</span></div>
+          <div id="animal-rows"></div>
+        </div>
+
+        <section class="section stack" id="consent" aria-label="Consent and signature">
+          <div class="stack-s">
+            <h3>Consent and signature</h3>
+            <span class="small" style="color:var(--ink2)">Your submission must be signed. Sign online here, or choose the paper consent form and put it in your box.</span>
+          </div>
+          <div class="choices" role="radiogroup" aria-label="How will you sign?">
+            <button type="button" class="choice" id="m-online" aria-pressed="true">Sign online now</button>
+            <button type="button" class="choice" id="m-paper" aria-pressed="false">Sign the paper form instead</button>
+          </div>
+          <div class="stack-s">
+            <b>NSIP enrolled animals</b>
+            <span class="small muted">For any animals enrolled in NSIP, your genotypes will be shared with NSIP. NSIP will use them to develop and deliver genomic-enhanced breeding values to the industry.</span>
+          </div>
+          <div id="online-part" class="stack">
+            <div class="consent-q" role="group" aria-labelledby="q-res">
+              <span class="stack-s"><b id="q-res">Allow MSU to use these samples, results and photos for sheep genomics research?</b>
+                <span class="small muted">Your flock is never identified in any presentations or publications. Your participation in research is completely voluntary and can be rescinded at anytime. You may be contacted for additional details depending on the specific research aim.</span></span>
+              <span class="choices"><button type="button" class="choice" id="r-y" aria-pressed="false">Yes</button><button type="button" class="choice" id="r-n" aria-pressed="false">No</button></span>
+            </div>
+            <div class="panel stack-s">
+              <b class="small">What you're agreeing to</b>
+              <ul style="margin:0;padding-left:18px;font-size:14px;color:var(--ink2)">
+                <li>You own or manage these animals, and the information on your form is accurate.</li>
+                <li>MSU sends the TSUs to its genotyping lab and reports genetic conditions and parentage back to you.</li>
+                <li>You'll be invoiced for the TSUs we receive.</li>
+                <li>You retain ownership of your animals' genotypes.</li>
+                <li>Results depend on sample quality and the information you provide. Some samples may fail and need resampling, and results are reported as-is without guarantee.</li>
+                <li>Your contact information and individual flock results will not be shared publicly.</li>
+              </ul>
+            </div>
+            <label class="check"><input type="checkbox" id="agree"> I agree to the above</label>
+            <div class="row"><label class="lbl" for="signer" style="white-space:nowrap">Type your full name to sign</label><input id="signer" class="field" autocomplete="name" style="flex:1;min-width:220px"></div>
+            <span class="small muted">Your typed name counts as your signature, dated today.</span>
+          </div>
+          <div id="paper-part" class="panel stack-s hidden">
+            <b>Sign on paper</b>
+            <span class="small" style="color:var(--ink2)"><a id="paper-link" href="#" target="_blank" rel="noopener">Print the consent form</a>, answer the research question, sign it and put it in your box with your TSUs. Your samples can't go to the lab until we have it.</span>
+            <label class="check"><input type="checkbox" id="paper-ack"> I'll put the signed consent form in my box</label>
+          </div>
+        </section>
+
+        <section class="section stack" id="photos" aria-label="Photos">
+          <div class="stack-s">
+            <h3>OPTIONAL: Animal Photos</h3>
+            <p class="small" style="color:var(--ink2)">Photos aid MSU research into sheep coat color genetics and are not part of your reported results. Add up to 5 per animal with the buttons in the list above, or add a batch of photos named by tag (J01.jpg, J01-2.jpg) and we'll match them.</p>
+          </div>
+          <label class="drop" id="photo-drop" for="photo-batch" style="padding:18px;flex-direction:row;justify-content:flex-start;text-align:left">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1F3A5F" stroke-width="1.6" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>
+            <span class="stack-s"><b>Drag photos here, or choose several at once</b><span class="small muted">JPG or PNG · resized before upload so it stays quick</span></span>
+            <input id="photo-batch" type="file" accept="image/*" multiple class="sr">
+          </label>
+          <span class="small muted" id="photo-note"></span>
+        </section>
+
+        <section class="section stack-s">
+          <label class="lbl" for="notes" style="font-size:16px">Notes or additional requests <span class="muted" style="font-weight:500">(optional)</span></label>
+          <span class="small muted" id="notes-hint">Anything we should know about these animals or this shipment, such as extra tests or which earlier samples to check parentage against.</span>
+          <textarea id="notes" class="field" rows="4" aria-describedby="notes-hint"></textarea>
+          <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" class="sr" aria-hidden="true">
+        </section>
+
+        <div class="section row">
+          <button type="button" class="btn btn-primary" id="submit" disabled>Submit</button>
+          <span class="small muted" id="submit-msg"></span>
+        </div>
+        <div class="section hidden" id="submit-error"></div>
+      </section>
+
+      <!-- 3. done -->
+      <section class="card pad stack hidden" id="done" style="gap:22px">
+        <div class="row" style="flex-wrap:nowrap;align-items:flex-start">
+          <span style="width:48px;height:48px;border-radius:999px;background:var(--good-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#123C69" stroke-width="2.6" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>
+          <div class="stack-s"><h2 class="serif" style="font-size:28px" id="done-title">Submitted</h2><span id="done-sub" style="color:var(--ink2)"></span></div>
+        </div>
+        <div id="photo-progress" class="hidden"></div>
+        <ol style="margin:0;padding:0;list-style:none" class="stack">
+          <li class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="mono" style="font-size:20px;color:var(--primary);width:28px">1</span>
+            <div class="stack-s"><b id="pack-label">Print the packing slip and put it in the box</b><div class="row"><a class="btn btn-ghost" id="slip-link" href="#" target="_blank">Print packing slip</a><a class="btn btn-ghost hidden" id="consent-link" href="#" target="_blank" rel="noopener">Print consent form</a></div></div></li>
+          <li class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="mono" style="font-size:20px;color:var(--primary);width:28px">2</span>
+            <div class="stack-s" style="flex:1"><b id="send-label">Send your TSUs to us, by mail or in person</b>
+              <div class="summary" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                <div class="panel stack-s"><span class="eyebrow" style="font-size:12px">Mail to</span><span id="mail-to"></span></div>
+                <div class="panel stack-s"><span class="eyebrow" style="font-size:12px">Or drop off at</span><span id="drop-at"></span></div>
+              </div></div></li>
+          <li class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="mono" style="font-size:20px;color:var(--primary);width:28px">3</span>
+            <div class="stack-s"><b>Follow progress with the link emailed to you</b><span style="color:var(--ink2)">It shows when your samples arrive, when they go to the genotyping lab, and your results when they are ready. <a id="status-link" href="#">Open it now</a>.</span></div></li>
+        </ol>
+        <div><button type="button" class="btn btn-ghost" onclick="location.reload()">Submit another form</button></div>
+      </section>
+    </div>
+
+    <aside class="stack">
+      <section class="card pad stack">
+        <h2 style="font-size:17px">Before you upload</h2>
+        <ul style="margin:0;padding-left:18px;font-size:14px;color:var(--ink2)" class="stack-s">
+          <li>Every animal needs its TSU barcode and an EID and/or flock tag.</li>
+          <li>Keep EIDs formatted as text so all 15 digits survive. If Excel shows 8.40003E+14, format the column as Text and re-enter.</li>
+          <li>Not sure of an older ewe's birth year? Enter a range like 2018-2020.</li>
+          <li>For parentage, genotypes are needed on sire and dam. Please send samples or tell us which were tested before to test against.</li>
+          <li>Delete the EXAMPLE row before you upload.</li>
+        </ul>
+      </section>
+      <section class="soft stack-s">
+        <h2 style="font-size:17px">Need help?</h2>
+        <p class="small" style="color:var(--ink2)" id="help"></p>
+      </section>
+    </aside>
+  </div>
+</main>
+<footer id="site-footer"></footer>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/validate.js"></script>
+<script src="assets/vendor/xlsx.full.min.js"></script>
+<script src="assets/js/submit.js"></script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Receiving · MSU Sheep Genotyping staff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<style>
+  .recv { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+  .exp-grid { grid-template-columns: 80px 130px 160px 100px 110px; }
+  .count { font-family: 'Fraunces', Georgia, serif; font-size: 44px; font-weight: 600; line-height: 1; }
+  .count small { font-size: 20px; color: var(--muted); }
+  .hold { border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; background: var(--warn-bg); color: var(--mid); }
+  .hold.ok { background: var(--good-bg); color: var(--good); }
+  .scanbox { height: 56px; font-size: 20px; font-family: 'IBM Plex Mono', monospace; }
+  .ev .mono { font-size: 12px; opacity: .7; }
+  .title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+  @media (max-width: 1000px) {
+    .recv { grid-template-columns: minmax(0, 1fr); }
+    .recv .side { order: -1; }
+    .exp-grid { grid-template-columns: 70px 1fr 100px; }
+    .exp-grid .opt { display: none; }
+    .tbl-head.exp-grid { display: grid; padding: 10px 16px; }
+  }
+</style>
+</head>
+<body>
+<header id="site-header"></header>
+<main class="page">
+  <div id="gate" class="hidden"></div>
+  <div id="app" class="hidden stack" style="gap:24px">
+
+    <!-- look up a box -->
+    <section id="lookup" class="card pad stack" style="max-width:640px">
+      <div class="stack-s"><h1 style="font-size:32px">Receive a box</h1>
+        <p style="color:var(--ink2)">Scan the QR code on the packing slip, or type the reference number (like P004-01 or P003-01-R1). No slip? Scan any TSU from the box.</p></div>
+      <div class="row">
+        <input id="q" class="field scanbox" style="flex:1;min-width:200px" placeholder="Ready for scanner…" autocomplete="off" aria-label="Reference or TSU">
+        <button type="button" class="btn btn-primary" id="find">Open</button>
+        <button type="button" class="btn btn-ghost hidden" id="q-cam">Scan with camera</button>
+      </div>
+      <div id="q-msg" class="hidden"></div>
+    </section>
+
+    <!-- receiving -->
+    <div id="box" class="stack hidden" style="gap:20px">
+      <div class="title-row">
+        <div class="stack-s">
+          <span class="eyebrow" id="b-eyebrow"></span>
+          <h1 style="font-size:34px" id="b-title"></h1>
+          <span style="color:var(--ink2)" id="b-sub"></span>
+        </div>
+        <div class="stack-s" style="align-items:flex-end">
+          <span class="count"><span id="got">0</span><small> of <span id="of">0</span></small></span>
+          <span class="small muted">TSUs received</span>
+        </div>
+      </div>
+      <div id="b-note" class="hidden"></div>
+      <div id="hold" class="hold hidden" role="status"></div>
+
+      <div class="recv">
+        <section class="card" aria-label="Expected TSUs">
+          <div class="tbl-head exp-grid"><span>Tag</span><span>TSU</span><span class="opt">EID</span><span class="opt">Sex · born</span><span>Status</span></div>
+          <div id="exp"></div>
+        </section>
+
+        <div class="side stack">
+          <!-- scanning -->
+          <div id="scan-pane" class="stack">
+            <section class="card pad stack-s">
+              <label class="lbl" for="scan">Scan or type a TSU barcode</label>
+              <input id="scan" class="field scanbox" placeholder="Ready for scanner…" autocomplete="off">
+              <div class="row"><button type="button" class="btn btn-ghost btn-sm" id="scan-go">Add</button>
+                <button type="button" class="btn btn-ghost btn-sm hidden" id="scan-cam">Scan with camera</button></div>
+            </section>
+            <section class="card pad stack-s" aria-label="Recent scans" aria-live="polite">
+              <span class="eyebrow" style="font-size:12px">Recent scans</span>
+              <div id="events" class="stack-s"><span class="small muted">Nothing scanned yet. Scan the first TSU from the box.</span></div>
+            </section>
+            <button type="button" class="btn btn-primary btn-block" id="finish">Finish receiving</button>
+            <span class="small muted" id="finish-hint"></span>
+            <button type="button" class="linkbtn" id="other-box">Open a different box</button>
+          </div>
+
+          <!-- check before finishing -->
+          <section id="check-pane" class="card pad stack hidden" aria-label="Check before finishing">
+            <h2 id="check-title"></h2>
+            <ul id="check-list" style="margin:0;padding-left:18px" class="stack-s"></ul>
+            <button type="button" class="btn btn-primary" id="commit">Mark received and write the email</button>
+            <button type="button" class="btn btn-ghost" id="back1">Back to scanning</button>
+            <div id="commit-err" class="hidden"></div>
+          </section>
+
+          <!-- email -->
+          <section id="mail-pane" class="card pad stack hidden" aria-label="Email to the producer">
+            <div id="saved-note" class="alert good"></div>
+            <div class="stack-s"><b>Email to the producer</b><span class="small muted" id="m-to"></span></div>
+            <label class="lbl" for="m-subj">Subject</label>
+            <input id="m-subj" class="field">
+            <label class="lbl" for="m-body">Message</label>
+            <textarea id="m-body" class="field" rows="12" aria-describedby="m-hint"></textarea>
+            <span class="small muted" id="m-hint">Edit anything you like. Nothing is sent until you press Send.</span>
+            <button type="button" class="btn btn-primary" id="send">Send email and finish</button>
+            <button type="button" class="linkbtn" id="skip">Finish without emailing</button>
+            <div id="send-err" class="hidden"></div>
+          </section>
+
+          <!-- done -->
+          <section id="done-pane" class="card pad stack hidden">
+            <h2 id="done-title"></h2>
+            <ul id="done-list" style="margin:0;padding-left:18px" class="stack-s"></ul>
+            <button type="button" class="btn btn-primary" id="another">Receive another box</button>
+            <button type="button" class="btn btn-ghost" id="reopen">Reopen this box</button>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<footer id="site-footer"></footer>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/scanner.js"></script>
+<script src="../assets/js/staff.js"></script>
+<script src="../assets/js/receive.js"></script>
+</body>
+</html>

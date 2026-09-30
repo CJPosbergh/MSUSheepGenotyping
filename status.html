@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Your samples · MSU Sheep Genotyping</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+  .title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+  .res-grid { grid-template-columns: 140px 200px 100px minmax(0, 1fr) 240px; }
+  .prog-grid { grid-template-columns: 140px 200px 160px minmax(0, 1fr); }
+  .cond { display: grid; grid-template-columns: 90px auto 1fr; gap: 10px; align-items: center; }
+  .cond-name { font-size: 12px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--label); }
+  .pill { height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid #CFC9BB; background: #fff; color: var(--ink); font: 500 14px 'Public Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .pill:hover { border-color: var(--primary); }
+  .pill[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .pill small { font-size: 12px; font-weight: 700; opacity: .8; }
+  .attn { border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+  .attn.qc { background: #FBE3DB; color: var(--bad); }
+  .attn.missing { background: var(--warn-bg); color: var(--mid); }
+  .attn.wait { background: #EFECE3; color: var(--ink2); }
+  .attn a { font-weight: 700; color: inherit; }
+  .cell-l { display: none; }
+  .span2 { grid-column: span 2; }
+  .meaning { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 40px; }
+  .meaning p { color: var(--ink2); font-size: 15px; margin-top: 6px; }
+  .dot-s { width: 8px; height: 8px; border-radius: 999px; display: inline-block; margin-right: 6px; }
+  @media (max-width: 900px) {
+    .res-grid, .prog-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .span2 { grid-column: auto; }
+    .tbl-head.res-grid, .tbl-head.prog-grid { display: none; }
+    .cell-l { display: inline; font-size: 12px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--label); margin-right: 8px; }
+    .meaning { grid-template-columns: minmax(0, 1fr); }
+    .cond { grid-template-columns: 70px auto 1fr; }
+  }
+  @media print {
+    .pill, .filters, .dl { display: none !important; }
+    .tbl-row { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<header id="site-header"></header>
+<main class="page">
+  <div id="loading" class="muted">Loading your submission…</div>
+  <div id="load-error" class="hidden"></div>
+
+  <div id="view" class="stack hidden" style="gap:28px">
+    <div class="title-row">
+      <div class="stack-s">
+        <span class="eyebrow" id="eyebrow"></span>
+        <h1 id="title"></h1>
+        <p class="lead" id="lead"></p>
+      </div>
+      <div class="row dl hidden" id="downloads">
+        <button type="button" class="btn btn-ghost" id="dl-pdf">Download PDF report</button>
+        <button type="button" class="btn btn-primary" id="dl-xlsx">Download Excel</button>
+      </div>
+    </div>
+    <div id="dl-msg" class="hidden"></div>
+
+    <section id="sig-banner" class="alert warn hidden" aria-label="Action needed"></section>
+    <section id="attn-banner" class="hidden" aria-label="Samples needed"></section>
+    <section id="repl-banner" class="hidden" aria-label="Replacements on their way"></section>
+
+    <section id="steps" class="card pad steps hidden" aria-label="Progress"></section>
+    <section id="stats" class="stats hidden" aria-label="Summary"></section>
+    <section id="other-conds" class="alert info hidden" aria-label="Other conditions"></section>
+
+    <section class="card" id="table" aria-label="Animals">
+      <div class="section row filters hidden" id="filters" style="justify-content:space-between"></div>
+      <div id="rows"></div>
+    </section>
+
+    <section class="card pad stack hidden" id="meaning" aria-label="What these results mean" style="gap:20px">
+      <h2 class="serif" style="font-size:24px;font-weight:600">What these results mean</h2>
+      <div class="meaning" id="meaning-body"></div>
+    </section>
+  </div>
+</main>
+<footer id="site-footer"></footer>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/status.js"></script>
+</body>
+</html>

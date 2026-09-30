@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sign your submission · MSU Sheep Genotyping</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+  .sign-page { max-width: 620px; }
+  .q { display: flex; flex-direction: column; gap: 8px; }
+  .q .choices .choice { flex: 1; max-width: 160px; }
+</style>
+</head>
+<body>
+<header id="site-header"></header>
+<main class="page sign-page">
+  <div id="loading" class="muted">Loading your submission…</div>
+  <div id="load-error" class="hidden"></div>
+
+  <div id="unsigned" class="stack hidden" style="gap:20px">
+    <div class="stack-s">
+      <span class="eyebrow" id="ref"></span>
+      <h1>Sign your submission</h1>
+      <p class="lead">Answer one question, review the terms and sign below.</p>
+    </div>
+
+    <section class="card pad stack" style="gap:20px">
+      <div class="q">
+        <b>NSIP enrolled animals</b>
+        <span class="small muted">For any animals enrolled in NSIP, your genotypes will be shared with NSIP. NSIP will use them to develop and deliver genomic-enhanced breeding values to the industry.</span>
+      </div>
+      <div class="q" role="group" aria-labelledby="q-res">
+        <b id="q-res">Allow MSU to use these samples, results and photos for sheep genomics research?</b>
+        <span class="small muted">Your flock is never identified in any presentations or publications. Your participation in research is completely voluntary and can be rescinded at anytime. You may be contacted for additional details depending on the specific research aim.</span>
+        <div class="choices"><button type="button" class="choice" id="r-y" aria-pressed="false">Yes</button><button type="button" class="choice" id="r-n" aria-pressed="false">No</button></div>
+      </div>
+    </section>
+
+    <section class="card pad stack">
+      <b>What you're agreeing to</b>
+      <ul style="margin:0;padding-left:18px;font-size:14px;color:var(--ink2)" class="stack-s">
+        <li>You own or manage these animals, and the information on your form is accurate.</li>
+        <li>MSU sends the TSUs to its genotyping lab and reports genetic conditions and parentage back to you.</li>
+        <li>You'll be invoiced for the TSUs we receive.</li>
+        <li>You retain ownership of your animals' genotypes.</li>
+        <li>Results depend on sample quality and the information you provide. Some samples may fail and need resampling, and results are reported as-is without guarantee.</li>
+        <li>Your contact information and individual flock results will not be shared publicly.</li>
+      </ul>
+      <label class="check"><input type="checkbox" id="agree"> I agree to the above</label>
+      <div class="stack-s">
+        <label class="lbl" for="fullname">Type your full name to sign</label>
+        <input id="fullname" class="field" type="text" autocomplete="name" aria-describedby="name-hint">
+        <span class="small muted" id="name-hint">This counts as your signature, dated today.</span>
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="sign" disabled>Sign submission</button>
+      <span class="small muted" id="todo"></span>
+      <div id="sign-error" class="hidden"></div>
+    </section>
+
+    <p class="small" style="color:var(--ink2)">Rather sign on paper? <a id="paper-link" href="#" target="_blank" rel="noopener">Print the consent form</a>, sign it and put it in your box, or email a photo of it to <span id="paper-email">us</span> with your reference <b id="paper-ref"></b>.</p>
+  </div>
+
+  <div id="signed" class="card pad stack hidden" style="gap:18px">
+    <span style="width:48px;height:48px;border-radius:999px;background:var(--good-bg);display:flex;align-items:center;justify-content:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#123C69" stroke-width="2.6" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>
+    <h1 style="font-size:32px">Signed. Thank you.</h1>
+    <p id="signed-msg" style="color:var(--ink2)"></p>
+    <div class="panel stack-s" id="signed-detail"></div>
+    <a class="btn btn-ghost" id="status-link" href="#">See where your samples are</a>
+  </div>
+</main>
+<footer id="site-footer"></footer>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/sign.js"></script>
+</body>
+</html>

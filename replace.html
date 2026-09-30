@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Send replacement TSUs · MSU Sheep Genotyping</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+  .animal { display: flex; gap: 14px; padding: 20px 24px; border-top: 1px solid var(--line2); }
+  .animal:first-child { border-top: none; }
+  .animal > input { width: 22px; height: 22px; margin-top: 3px; accent-color: var(--primary); flex-shrink: 0; }
+  .reason { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+  .r-qc { background: #FBE3DB; color: var(--bad); }
+  .r-miss { background: var(--warn-bg); color: var(--mid); }
+  .opt { display: flex; gap: 10px; align-items: center; font-size: 15px; cursor: pointer; }
+  .opt input { width: 18px; height: 18px; accent-color: var(--primary); }
+  .tsu-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .tsu-row .stack-s { flex: 1; min-width: 200px; max-width: 320px; }
+  @media (max-width: 640px) { .animal { padding: 16px; } }
+</style>
+</head>
+<body>
+<header id="site-header"></header>
+<main class="page">
+  <div id="loading" class="muted">Loading your submission…</div>
+  <div id="load-error" class="hidden"></div>
+
+  <div id="pick" class="stack hidden" style="gap:24px">
+    <div class="stack-s">
+      <span class="eyebrow" id="ref"></span>
+      <h1>Send replacement TSUs</h1>
+      <p class="lead">These animals still need a sample. Tell us which TSU you're sending for each one, then print a slip for the bag. Replacements for samples that failed the lab check are free.</p>
+    </div>
+    <div class="grid-main">
+      <section class="card" aria-label="Animals needing a sample">
+        <div id="animals"></div>
+        <div class="section row">
+          <button type="button" class="btn btn-primary" id="go" disabled>Register</button>
+          <span class="small muted" id="hint"></span>
+        </div>
+        <div class="section hidden" id="go-error"></div>
+      </section>
+      <aside class="stack">
+        <section class="card pad stack-s">
+          <h2 style="font-size:17px">Taking a new TSU</h2>
+          <ul style="margin:0;padding-left:18px;font-size:14px;color:var(--ink2)" class="stack-s">
+            <li>Use a fresh TSU from the same animal, and check the TSU before you sample.</li>
+            <li>Make sure tissue is visible in the tube before you bag it.</li>
+            <li>Keep the new barcode with the right animal: it replaces the old one on your records.</li>
+          </ul>
+        </section>
+        <section class="soft stack-s">
+          <h2 style="font-size:17px">Need help?</h2>
+          <p class="small" style="color:var(--ink2)" id="help"></p>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <div id="nothing" class="card pad stack hidden">
+    <h2>No samples needed right now</h2>
+    <p style="color:var(--ink2)">Every animal on this submission has a sample, or a replacement is already on its way.</p>
+    <div><a class="btn btn-ghost back">Back to your results</a></div>
+  </div>
+
+  <section id="done" class="card pad stack hidden" style="gap:22px">
+    <div class="row" style="flex-wrap:nowrap;align-items:flex-start">
+      <span style="width:48px;height:48px;border-radius:999px;background:var(--good-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#123C69" stroke-width="2.6" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>
+      <div class="stack-s"><h2 class="serif" style="font-size:28px" id="done-title"></h2><span id="done-sub" style="color:var(--ink2)"></span></div>
+    </div>
+    <ol style="margin:0;padding:0;list-style:none" class="stack">
+      <li class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="mono" style="font-size:20px;color:var(--primary);width:28px">1</span>
+        <div class="stack-s"><b>Print the replacement slip and put it in the bag</b><div><a class="btn btn-ghost" id="slip" target="_blank">Print replacement slip</a></div></div></li>
+      <li class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="mono" style="font-size:20px;color:var(--primary);width:28px">2</span>
+        <div class="stack-s"><b>Mail it or drop it off, as before</b><span style="color:var(--ink2)" id="where"></span></div></li>
+      <li class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="mono" style="font-size:20px;color:var(--primary);width:28px">3</span>
+        <div class="stack-s"><b>We'll email you when it arrives</b><span style="color:var(--ink2)">It goes to the lab in the next batch, and the results appear on your same results page.</span></div></li>
+    </ol>
+    <div><a class="btn btn-ghost back">Back to your results</a></div>
+  </section>
+</main>
+<footer id="site-footer"></footer>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/scanner.js"></script>
+<script src="assets/js/replace.js"></script>
+</body>
+</html>

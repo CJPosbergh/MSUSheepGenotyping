@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Packing slip · MSU Sheep Genotyping</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+  body { background: #E9E6DE; }
+  .toolbar { max-width: 816px; margin: 20px auto 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 0 16px; flex-wrap: wrap; }
+  .sheet { width: 816px; max-width: 100%; min-height: 1056px; margin: 16px auto 40px; background: #fff; padding: 48px 56px; display: flex; flex-direction: column; gap: 22px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; border-bottom: 2px solid var(--ink); padding-bottom: 16px; }
+  .k { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--label); }
+  .v { font-size: 13px; line-height: 1.45; }
+  .three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+  .tbl { border: 1px solid #CFC9BB; border-radius: 6px; overflow: hidden; }
+  .tr { display: grid; grid-template-columns: 10px 44px 76px 110px minmax(0, 1fr); gap: 6px; padding: 3px 8px; align-items: center; font-size: 10px; line-height: 14px; border-top: 1px solid #ECE8DE; }
+  .th { background: var(--head); font-weight: 700; color: var(--label); border-top: none; letter-spacing: .3px; text-transform: uppercase; }
+  .box { width: 10px; height: 10px; border: 1.5px solid var(--ink); border-radius: 2px; }
+  .pack { background: var(--bg); border-radius: 10px; padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; }
+  #qr svg { width: 96px; height: 96px; display: block; }
+  @media screen and (max-width: 700px) {
+    .sheet { padding: 24px 16px; min-height: 0; }
+    .three, .cols { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media print {
+    @page { size: letter; margin: 0; }
+    html, body { background: #fff; }
+    .toolbar { display: none; }
+    .sheet { box-shadow: none; margin: 0; width: 8.5in; min-height: 0; padding: 0.4in 0.55in; gap: 16px; }
+    .tr { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar no-print">
+  <a id="back" href="#">Back</a>
+  <button type="button" class="btn btn-primary" onclick="window.print()" id="print" disabled>Print this slip</button>
+</div>
+<div id="msg" class="hidden" style="max-width:816px;margin:16px auto"></div>
+<div class="sheet hidden" id="sheet">
+  <div class="top">
+    <div class="stack-s">
+      <span class="k" style="font-size:12px;letter-spacing:.8px" id="kind">MSU Sheep Genotyping · Packing slip</span>
+      <span style="font-family:'Fraunces',Georgia,serif;font-size:36px;font-weight:600;line-height:1" id="ref"></span>
+      <span style="font-size:14px" id="subline"></span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+      <div id="qr" aria-label="QR code of your reference"></div>
+      <span style="font-size:10px;color:var(--label)">Scanned when your package is opened</span>
+    </div>
+  </div>
+  <div class="three">
+    <div class="stack-s" style="gap:4px"><span class="k">Mail to</span><span class="v" id="mail"></span></div>
+    <div class="stack-s" style="gap:4px"><span class="k">Or drop off at</span><span class="v" id="drop"></span></div>
+    <div class="stack-s" style="gap:4px"><span class="k">From</span><span class="v" id="from"></span></div>
+  </div>
+  <div class="stack-s" style="gap:8px">
+    <span style="font-size:14px;font-weight:700" id="count"></span>
+    <div class="cols" id="cols"></div>
+  </div>
+  <div class="pack">
+    <span style="font-weight:700">Packing</span>
+    <span>Keep the TSUs together in a sealed plastic bag to prevent any leaks. These can then be shipped at ambient conditions in a small box or padded envelope. Please include this slip in your shipment.</span>
+    <span id="consent-line" class="hidden" style="font-weight:700"></span>
+    <span id="missing-line"></span>
+    <span id="rep-line" class="hidden">Replacement TSUs for samples that failed the lab check are tested at no charge.</span>
+  </div>
+  <span style="font-size:11px;color:var(--label)" id="printed"></span>
+</div>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/vendor/qrcode.js"></script>
+<script src="assets/js/slip.js"></script>
+</body>
+</html>
