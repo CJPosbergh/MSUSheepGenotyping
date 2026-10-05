@@ -50,6 +50,7 @@
       var b = ''; for (var j = 0; j < buf.length; j += 0x8000) b += String.fromCharCode.apply(null, buf.subarray(j, j + 0x8000));
       state.fileB64 = btoa(b);
       state.photos = {};
+      state.requestId = App.newId();      // same id if Submit is pressed again for this file: never a duplicate
       msg.classList.add('hidden');
       showReview();
     };
@@ -176,6 +177,7 @@
     $('submit-error').classList.add('hidden');
     var paper = state.method === 'paper';
     App.api('submit', {
+      requestId: state.requestId,
       submitter: state.parsed.submitter, animals: state.parsed.animals, notes: $('notes').value, website: $('website').value,
       signature: paper ? { method: 'paper', paperAck: $('paper-ack').checked }
         : { method: 'online', research: state.research, agree: $('agree').checked, name: $('signer').value.trim() },
@@ -185,7 +187,10 @@
       if (err.details) { showErrors(err.details); $('errors').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
       var box = $('submit-error');
       box.classList.remove('hidden');
-      box.innerHTML = '<div class="alert bad"><span>' + esc(err.message) + '</span></div>';
+      box.innerHTML = '<div class="alert bad"><span>' + (err.transport
+        ? '<b>We couldn\'t confirm your submission.</b> ' + esc(err.message) + ' It may still have been saved: check your email for a ' +
+          'confirmation with your packing slip link. If nothing arrives in a few minutes, press Submit again. It is safe: the same form won\'t be entered twice.'
+        : esc(err.message)) + '</span></div>';
     });
   };
 

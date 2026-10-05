@@ -8,7 +8,7 @@
   App.footer();
   Array.prototype.forEach.call(document.querySelectorAll('.back'), function (a) { a.href = statusUrl; });
 
-  var items = [], busy = false;
+  var items = [], busy = false, requestId = App.newId();
 
   App.config().then(function (c) {
     $('help').innerHTML = esc(c.contactEmail || 'christian.posbergh@montana.edu') + '<br>' + esc(c.contactPhone || '406-994-3736');
@@ -85,7 +85,7 @@
       var orig = it.a.attention === 'missing' && it.useOriginal;
       return { animalKey: it.a.key, useOriginal: orig, tsu: orig ? '' : norm(it.tsu) };
     });
-    App.api('replace', { token: token, items: payload }).then(function (d) {
+    App.api('replace', { token: token, items: payload, requestId: requestId }).then(function (d) {
       $('pick').classList.add('hidden');
       $('done').classList.remove('hidden');
       $('done-title').textContent = 'Registered. Your reference is ' + d.replacementId;

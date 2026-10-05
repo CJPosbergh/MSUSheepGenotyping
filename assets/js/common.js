@@ -14,19 +14,55 @@
     return new URLSearchParams(location.search).get(name) || '';
   }
 
-  /** POST { action, ...payload } to the Apps Script web app. Resolves with data, rejects with Error(message). */
+  function newId() {
+    var a = new Uint8Array(12), s = '';
+    (window.crypto || window.msCrypto).getRandomValues(a);
+    for (var i = 0; i < a.length; i++) s += ('0' + a[i].toString(16)).slice(-2);
+    return s;
+  }
+
+  var RETRY_DELAYS = [1500, 4000, 8000, 15000];
+
+  /**
+   * POST { action, requestId, ...payload } to the Apps Script web app. Resolves with data, rejects with
+   * Error(message). If Google's answer doesn't come back (an error page such as 404, or a dropped connection),
+   * it asks again with the same requestId: the back end recognises it and returns the answer it already saved,
+   * so nothing is done twice. Pass payload.requestId to keep one id across separate button presses.
+   * Errors from the back end itself (e.code set) are not retried. A request that never got an answer has
+   * e.transport = true: it may or may not have been saved.
+   */
   function api(action, payload) {
     var url = (window.SITE_CONFIG || {}).API_URL;
-    var body = JSON.stringify(Object.assign({ action: action }, payload || {}));
-    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: body, redirect: 'follow' })
-      .then(function (r) {
-        if (!r.ok) throw new Error('The server did not answer (' + r.status + '). Please try again in a minute.');
-        return r.json();
-      }, function () { throw new Error('Could not reach the server. Check your internet connection and try again.'); })
-      .then(function (d) {
-        if (!d.ok) { var e = new Error(d.error || 'Something went wrong.'); e.details = d.details; e.code = d.code; throw e; }
-        return d;
+    var body = JSON.stringify(Object.assign({ action: action, requestId: newId() }, payload || {}));
+    var lastStatus = 0;
+    function once() {
+      return fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: body, redirect: 'follow' })
+        .then(function (r) {
+          lastStatus = r.status;
+          if (!r.ok) throw { retry: true };
+          return r.json().catch(function () { throw { retry: true }; }).then(function (d) {
+            // Only accept an answer to this action (an answer without it, e.g. the GET health check, means it went astray)
+            if (d && d.ok && d.action !== action) { lastStatus = 'stray'; throw { retry: true }; }
+            return d;
+          });
+        }, function () { lastStatus = 0; throw { retry: true }; });
+    }
+    function attempt(i) {
+      return once().catch(function (x) {
+        if (!x || !x.retry || i >= RETRY_DELAYS.length) throw x;
+        return new Promise(function (res) { setTimeout(res, RETRY_DELAYS[i]); }).then(function () { return attempt(i + 1); });
       });
+    }
+    return attempt(0).then(function (d) {
+      if (!d.ok) { var e = new Error(d.error || 'Something went wrong.'); e.details = d.details; e.code = d.code; throw e; }
+      return d;
+    }, function (x) {
+      if (x instanceof Error) throw x;
+      var e = new Error(lastStatus === 'stray' ? 'The server sent back an unexpected answer. Please reload the page in a minute.'
+        : lastStatus ? 'The server did not answer properly (' + lastStatus + ').' : 'Could not reach the server. Check your internet connection.');
+      e.transport = true;
+      throw e;
+    });
   }
 
   var configPromise = null;
@@ -99,6 +135,6 @@
     return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
   }
 
-  window.App = { esc: esc, param: param, api: api, config: config, header: header, footer: footer, notice: notice,
+  window.App = { newId: newId, esc: esc, param: param, api: api, config: config, header: header, footer: footer, notice: notice,
     chipClass: chipClass, downloadBase64: downloadBase64, downloadBlob: downloadBlob, mapsLink: mapsLink, joinList: joinList, addressHtml: addressHtml, LOGO: LOGO };
 })();
