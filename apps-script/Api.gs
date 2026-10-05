@@ -18,7 +18,10 @@ function actions_() {
 }
 var READ_ONLY = { config: 1, status: 1, slip: 1, download: 1, staffCheck: 1, lookup: 1, ready: 1, batches: 1, batchRows: 1 };
 
+/** Health check (open the /exec URL in a browser). The website only ever POSTs, so a doGet run in
+    Apps Script > Executions right after a page load means Google turned a POST into a GET; the page retries. */
 function doGet(e) {
+  console.log('doGet ' + JSON.stringify((e && e.parameter) || {}));
   return json_({ ok: true, service: 'MSU Sheep Genotyping', time: new Date().toISOString() });
 }
 
@@ -45,8 +48,17 @@ function handle_(req) {
       lock = LockService.getScriptLock();
       lock.waitLock(30000);
     }
+    // The website sends a random requestId with every call and repeats the same id when it retries.
+    // Google sometimes answers a POST with an error page (e.g. 404) even though the script ran and saved
+    // everything; the retry then gets the saved answer here instead of doing the work twice.
+    var key = requestKey_(action, req.requestId);
+    var cache = key ? CacheService.getScriptCache() : null;
+    var seen = cache && cache.get(key);
+    if (seen) return JSON.parse(seen);
     var data = fn(req) || {};
     data.ok = true;
+    data.action = action;     // the website checks this, so a stray answer (e.g. from doGet) is never taken as the result
+    if (cache) { try { cache.put(key, JSON.stringify(data), 21600); } catch (e) { console.error('Caching ' + action + ': ' + e.message); } }
     return data;
   } catch (err) {
     console.error(action + ': ' + (err && err.stack || err));
@@ -57,6 +69,12 @@ function handle_(req) {
   } finally {
     if (lock) lock.releaseLock();
   }
+}
+
+function requestKey_(action, id) {
+  if (READ_ONLY[action]) return '';
+  id = String(id || '');
+  return /^[A-Za-z0-9]{12,64}$/.test(id) ? 'req_' + action + '_' + id : '';
 }
 
 function json_(obj) {
