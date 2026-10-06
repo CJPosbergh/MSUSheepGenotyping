@@ -32,17 +32,17 @@ Submission statuses: Submitted → Received (or On hold) → At lab → Analyzin
 
 ## First-time setup
 
-Do these once, in this order. Everything runs as **cposbergh@gmail.com**.
+Do these once, in this order. 
 
 ### 1. The tracker Sheet
-1. In Google Drive (as cposbergh@gmail.com) upload `tracker/MSU_Sheep_Genotyping_Tracker_START.xlsx`, open it, then **File > Save as Google Sheets**. Use the Google Sheets copy from now on and delete the uploaded .xlsx. (`…_EXAMPLE.xlsx` is the same tracker filled with made-up data, for looking around.)
+1. In Google Drive  upload `tracker/MSU_Sheep_Genotyping_Tracker_START.xlsx`, open it, then **File > Save as Google Sheets**. Use the Google Sheets copy from now on and delete the uploaded .xlsx. (`…_EXAMPLE.xlsx` is the same tracker filled with made-up data, for looking around.)
 2. On the **Settings** tab check every value. In particular:
    - `Staff_Passphrase`: type the staff passphrase here, and only here. The copies of the tracker in this public repo leave it blank on purpose; the staff pages stay locked while it is blank.
    - `Blank_Submission_Form` and `Paper_Consent_Form`: Drive links. Set both files to **Share > Anyone with the link > Viewer**, or producers can't open them.
    - `Site_URL`: the GitHub Pages address, ending in `/`. Every link in every email starts with it.
    - `Mailing_Address`, `Dropoff_Location`, `Dropoff_Hours`, `Contact_Email`, `Contact_Phone`, `Checks_Payable_To`: shown on pages, slips, invoices and emails.
    - Leave the `…_Folder_ID`, `…_Template_ID` rows blank: Set up fills them.
-3. Check **Cost_Share** (CS01 = ASI Fine Wool genotyping, Erika Sanko, esanko@sheepusa.org, through Dec 2027; GR01 is a placeholder for your grant funder), **Services** (GENO $18, TSU $2.75) and **Conditions** / **Result_Key** (what the tests are and how each call is labelled).
+3. Check **Cost_Share**  **Services** (GENO $18, TSU $2.75) and **Conditions** / **Result_Key** (what the tests are and how each call is labelled).
 
 ### 2. The Apps Script back end
 1. In the Sheet: **Extensions > Apps Script**. Name the project "MSU Sheep Genotyping".
