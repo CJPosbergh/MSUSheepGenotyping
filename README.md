@@ -5,7 +5,7 @@ The producer genotyping service run by the MSU Sheep Program: producers submit s
 | Part | Where it lives | What it does |
 |---|---|---|
 | Website | This repo, served by GitHub Pages at https://cjposbergh.github.io/MSUSheepGenotyping/ | Submission page, private status/results page, sign, replacement and packing-slip pages, and the two staff pages |
-| Tracker | A Google Sheet owned by cposbergh@gmail.com | Every producer, submission, animal, batch, result, invoice and email |
+| Tracker | A Google Sheet | Every producer, submission, animal, batch, result, invoice and email |
 | Back end | Apps Script bound to the tracker (`apps-script/`) | Answers the website, sends email, makes invoice PDFs, adds the **Genotyping** menu |
 | Results files | R (`r/`) on your computer | Pushes genotype calls and parentage to the tracker, makes each producer's PDF and Excel results |
 | Drive | "MSU Sheep Genotyping" folder in the same account | Uploaded forms, photos, invoices, results files, GenomNZ batch files |
