@@ -173,7 +173,7 @@
   $('submit').onclick = function () {
     if (state.busy) return;
     state.busy = true; refresh();
-    $('submit').textContent = 'Submitting…';
+    $('submit').textContent = 'Submitting… this can take 10–20 seconds';
     $('submit-error').classList.add('hidden');
     var paper = state.method === 'paper';
     App.api('submit', {

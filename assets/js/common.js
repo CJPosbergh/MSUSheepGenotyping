@@ -65,10 +65,21 @@
     });
   }
 
+  // Addresses, hours and links change rarely: keep them in this browser for an hour to save a server round trip.
+  var CONFIG_KEY = 'msuGenoConfig', CONFIG_TTL = 3600 * 1000;
   var configPromise = null;
   function config() {
     if (!configPromise) {
-      configPromise = api('config').then(function (d) { return d.config; }).catch(function () { return {}; });
+      var saved = null;
+      try { saved = JSON.parse(localStorage.getItem(CONFIG_KEY) || 'null'); } catch (e) { saved = null; }
+      if (saved && saved.at && Date.now() - saved.at < CONFIG_TTL && saved.url === (window.SITE_CONFIG || {}).API_URL) {
+        configPromise = Promise.resolve(saved.config);
+      } else {
+        configPromise = api('config').then(function (d) {
+          try { localStorage.setItem(CONFIG_KEY, JSON.stringify({ at: Date.now(), url: (window.SITE_CONFIG || {}).API_URL, config: d.config })); } catch (e) { /* private window */ }
+          return d.config;
+        }).catch(function () { return {}; });
+      }
     }
     return configPromise;
   }
