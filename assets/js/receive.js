@@ -48,6 +48,7 @@
     if (!rep && s.receivedDate) App.notice($('b-note'), 'info', 'This box was already received on ' + esc(s.receivedDate) + '. Scanning adds any TSUs that arrived late; finishing again sends a new receipt.');
     else $('b-note').classList.add('hidden');
     history.replaceState(null, '', '?ref=' + encodeURIComponent(d.ref));
+    rack = null; $('rack').classList.add('hidden');
     show('box'); pane('scan-pane');
     renderAll();
     $('scan').focus();
@@ -102,7 +103,7 @@
 
   function renderFinish() {
     var need = paper.present && !paper.research;
-    $('finish').disabled = busy || need;
+    $('finish').disabled = busy || need || busyRack();
     $('finish').textContent = 'Finish receiving (' + gotCount() + ' of ' + V.expected.length + ')';
     $('finish-hint').textContent = need ? 'Record the research answer from the paper form to finish.' : '';
   }
@@ -143,6 +144,161 @@
   $('scan').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); scanTyped(); } };
   $('scan-go').onclick = scanTyped;
   $('scan-cam').onclick = function () { Scanner.open(scan, { keepOpen: true, prompt: 'Point the camera at each TSU barcode in turn' }); };
+
+  // ---------------------------------------------------------------- a whole rack from one photo
+  // rack = { phase: reading|preview|saving|done|error, msg, frac, read (RackScan result), out: { tsu: server result }, mirror, sel }
+  var rack = null;
+  var RK_TIPS = 'Fill the photo with the rack, hold the phone flat and steady under it, use soft light with no flash, and tap the screen to focus.';
+
+  $('rack-btn').onclick = function () { if (!busyRack()) $('rack-file').click(); };
+  $('rack-file').onchange = function (e) {
+    var f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (f) readRack(f);
+  };
+  function busyRack() { return rack && (rack.phase === 'reading' || rack.phase === 'saving'); }
+
+  function readRack(file) {
+    rack = { phase: 'reading', msg: 'Opening the photo…', frac: 0, read: null, out: {}, mirror: false, sel: null };
+    renderRack();
+    $('rack').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    RackScan.read(file, function (msg, frac) {
+      if (!rack || rack.phase !== 'reading') return;
+      rack.msg = msg; rack.frac = frac;
+      var bar = $('rk-bar'), m = $('rk-msg');
+      if (bar) bar.style.width = Math.round(frac * 100) + '%';
+      if (m) m.textContent = msg;
+    }).then(function (r) {
+      if (!rack) return;
+      rack.read = r;
+      rack.phase = r.codes.length ? 'preview' : 'error';
+      if (!r.codes.length) rack.msg = 'No barcodes were found in that photo.';
+      renderRack();
+    }).catch(function (e) {
+      if (!rack) return;
+      rack.phase = 'error'; rack.msg = e.message || 'The photo could not be read.';
+      renderRack();
+    });
+  }
+
+  function checkInRack() {
+    var codes = rack.read.codes;
+    rack.phase = 'saving'; renderRack();
+    var payload = codes.map(function (c) { return { tsu: c.text, pos: c.row + ',' + c.col }; });
+    queue = queue.then(function () {
+      return Staff.call('scanRack', { ref: V.ref, tsus: payload }).then(function (d) {
+        var tally = { ok: 0, dup: 0, repeat: 0 }, others = {}, unknown = [];
+        d.results.forEach(function (x) {
+          rack.out[x.tsu] = x;
+          if (x.result === 'ok') { tally.ok++; V.expected.forEach(function (e) { if (e.tsu === x.tsu) e.received = true; }); }
+          else if (x.result === 'dup') tally.dup++;
+          else if (x.result === 'repeat') tally.repeat++;
+          else if (x.result === 'other') { var k = x.otherRef || x.belongs; (others[k] = others[k] || { belongs: x.belongs.replace(/ \(.*\)$/, ''), tsus: [] }).tsus.push(x.tsu); }
+          else unknown.push(x.tsu);
+        });
+        rack.tally = tally; rack.others = others; rack.unknown = unknown;
+        Object.keys(others).forEach(function (k) {
+          var o = others[k], many = o.tsus.length > 1;
+          extras.push(o.tsus.length + ' TSU' + (many ? 's' : '') + ' from the rack (' + o.tsus.join(', ') + ') belong' + (many ? '' : 's') + ' to ' + o.belongs + '. Set ' + (many ? 'them' : 'it') + ' aside.');
+        });
+        if (unknown.length) extras.push(unknown.join(', ') + ' from the rack ' + (unknown.length > 1 ? 'are' : 'is') + ' not on any submission. Set ' + (unknown.length > 1 ? 'them' : 'it') + ' aside.');
+        var bits = [];
+        if (tally.dup) bits.push(tally.dup + ' already in');
+        var nOther = Object.keys(others).reduce(function (a, k) { return a + others[k].tsus.length; }, 0);
+        if (nOther) bits.push(nOther + ' for other boxes');
+        if (unknown.length) bits.push(unknown.length + ' unknown');
+        events.push({ n: ++n, cls: nOther || unknown.length ? 'ev-other' : 'ev-ok', title: 'Rack photo: ' + tally.ok + ' received', sub: bits.join(' · ') });
+        rack.phase = 'done';
+        renderRack(); renderExpected(); renderEvents(); renderFinish();
+      }).catch(function (e) {
+        rack.phase = 'preview'; rack.err = e.message + (e.transport ? ' Nothing is lost: press Check in again.' : '');
+        renderRack();
+      });
+    });
+  }
+
+  function cellState(tsu) {
+    if (!tsu) return ['rk-empty', 'No code read here (an empty well, or a code to scan by hand)'];
+    var o = rack.out[tsu];
+    if (o) {
+      if (o.result === 'ok') return ['rk-ok', tsu + ': received (' + o.tag + ')'];
+      if (o.result === 'dup' || o.result === 'repeat') return ['rk-dup', tsu + ': already checked in' + (o.tag ? ' (' + o.tag + ')' : '')];
+      if (o.result === 'other') return ['rk-other', tsu + ': belongs to ' + o.belongs + '. Set it aside.'];
+      return ['rk-other', tsu + ': not on any submission. Set it aside.'];
+    }
+    var e = V.expected.filter(function (x) { return x.tsu === tsu; })[0];
+    if (!e) return ['rk-not', tsu + ': not on this ' + (V.kind === 'replacement' ? 'replacement' : 'submission')];
+    return e.received ? ['rk-have', tsu + ': already checked in (' + e.tag + ')'] : ['rk-exp', tsu + ': ' + e.tag + ', on this box'];
+  }
+
+  function renderRack() {
+    var box = $('rack');
+    if (V) renderFinish();
+    if (!rack) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    var h = '<div class="row" style="justify-content:space-between;align-items:baseline"><h2 style="font-size:22px">Rack photo</h2>' +
+      (busyRack() ? '' : '<button type="button" class="linkbtn" id="rk-close">Close</button>') + '</div>';
+    if (rack.phase === 'reading') {
+      h += '<div class="rk-bar"><span id="rk-bar" style="width:' + Math.round(rack.frac * 100) + '%"></span></div><span class="small muted" id="rk-msg">' + esc(rack.msg) + '</span>';
+      box.innerHTML = h; return;
+    }
+    if (rack.phase === 'error') {
+      h += '<div class="alert warn"><span><b>' + esc(rack.msg) + '</b> ' + RK_TIPS + ' Or scan the TSUs one at a time.</span></div>' +
+        '<div class="row"><button type="button" class="btn btn-primary btn-sm" id="rk-again">Try another photo</button></div>';
+      box.innerHTML = h; wireRack(); return;
+    }
+    var r = rack.read, cells = r.cells, empty = 0;
+    cells.forEach(function (row) { row.forEach(function (t) { if (!t) empty++; }); });
+    var onBox = r.codes.filter(function (c) { return V.expected.some(function (e) { return e.tsu === c.text; }); }).length;
+    if (rack.phase === 'preview' || rack.phase === 'saving') {
+      h += '<p style="margin:0"><b>Read ' + r.codes.length + ' code' + (r.codes.length === 1 ? '' : 's') + '</b> in ' + r.seconds + ' s: ' +
+        onBox + ' on this box' + (r.codes.length - onBox ? ', <b>' + (r.codes.length - onBox) + ' not on this box</b>' : '') + '.' +
+        (empty ? ' ' + empty + ' position' + (empty === 1 ? '' : 's') + ' had no readable code.' : '') + '</p>';
+      if (r.cols && (r.codes.length < 0.5 * r.rows * r.cols || r.codes.length < 12) && r.codes.length > 1) h += '<div class="alert info"><span>Fewer codes than expected? ' + RK_TIPS + '</span></div>';
+    } else {
+      var t = rack.tally, nOther = Object.keys(rack.others).reduce(function (a, k) { return a + rack.others[k].tsus.length; }, 0);
+      var items = ['<li><b>' + t.ok + '</b> checked in</li>'];
+      if (t.dup) items.push('<li>' + t.dup + ' were already checked in</li>');
+      Object.keys(rack.others).forEach(function (k) { var o = rack.others[k]; var many = o.tsus.length > 1; items.push('<li><b>' + o.tsus.length + ' belong' + (many ? '' : 's') + ' to ' + esc(o.belongs) + '</b>: set ' + (many ? 'them' : 'it') + ' aside (red)</li>'); });
+      if (rack.unknown.length) items.push('<li><b>' + rack.unknown.length + ' not on any submission</b>: set aside (red)</li>');
+      if (empty) items.push('<li>' + empty + ' position' + (empty === 1 ? '' : 's') + ' with no code read (dashed): if a vial is there, scan it by hand</li>');
+      var left = missing().length;
+      items.push('<li>' + (left ? left + ' TSU' + (left === 1 ? '' : 's') + ' on this box still not checked in' : 'Every TSU on this box is checked in') + '</li>');
+      h += '<ul style="margin:0;padding-left:18px" class="stack-s">' + items.join('') + '</ul>';
+    }
+    if (r.cols) {
+      h += '<div class="rack-grid" role="grid" aria-label="Rack positions" style="grid-template-columns:repeat(' + r.cols + ',minmax(0,1fr));max-width:' + Math.min(760, r.cols * 62) + 'px">';
+      for (var a = 0; a < r.rows; a++) for (var b = 0; b < r.cols; b++) {
+        var col = rack.mirror ? r.cols - 1 - b : b, tsu = cells[a][col], st = cellState(tsu);
+        h += '<button type="button" class="rk ' + st[0] + (rack.sel === a + ',' + col ? ' sel' : '') + '" data-rc="' + a + ',' + col + '" title="' + esc(st[1]) + '" aria-label="' + esc(st[1]) + '">' + (tsu ? esc(tsu.slice(-3)) : '') + '</button>';
+      }
+      h += '</div>';
+      var selT = rack.sel ? cells[+rack.sel.split(',')[0]][+rack.sel.split(',')[1]] : undefined;
+      h += '<span class="small" id="rk-sel">' + (rack.sel ? esc(cellState(selT)[1]) : 'Tap a position to see its TSU.') + '</span>';
+      h += '<div class="rk-key">' + (rack.phase === 'done'
+        ? '<span><i style="border-color:var(--good);background:var(--good-bg)"></i>Checked in</span><span><i style="border-color:#C99700;background:var(--warn-bg)"></i>Already in</span><span><i style="border-color:var(--bad);background:#FBE3DB"></i>Set aside</span>'
+        : '<span><i style="border-color:var(--primary)"></i>On this box</span><span><i style="border-color:var(--bad);border-style:dashed"></i>Not on this box</span>') +
+        '<span><i style="border-color:var(--line);border-style:dashed;background:var(--bg)"></i>No code read</span></div>';
+      h += '<label class="check small"><input type="checkbox" id="rk-mirror"' + (rack.mirror ? ' checked' : '') + '> Show as seen from above (the photo shows the bottoms, so left and right are swapped)</label>';
+    }
+    if (rack.err && rack.phase === 'preview') h += '<div class="alert bad"><span>' + esc(rack.err) + '</span></div>';
+    if (rack.phase === 'preview') h += '<div class="row"><button type="button" class="btn btn-primary" id="rk-go">Check in ' + r.codes.length + ' TSU' + (r.codes.length === 1 ? '' : 's') + '</button>' +
+      '<button type="button" class="btn btn-ghost" id="rk-again">Use a different photo</button></div>';
+    if (rack.phase === 'saving') h += '<div class="row"><button type="button" class="btn btn-primary" disabled>Checking in ' + r.codes.length + '…</button></div>';
+    if (rack.phase === 'done') h += '<div class="row"><button type="button" class="btn btn-ghost btn-sm" id="rk-again">Check in another rack</button></div>';
+    box.innerHTML = h;
+    wireRack();
+  }
+
+  function wireRack() {
+    if ($('rk-close')) $('rk-close').onclick = function () { rack = null; renderRack(); $('scan').focus(); };
+    if ($('rk-again')) $('rk-again').onclick = function () { $('rack-file').click(); };
+    if ($('rk-go')) $('rk-go').onclick = function () { rack.err = ''; checkInRack(); };
+    if ($('rk-mirror')) $('rk-mirror').onchange = function (e) { rack.mirror = e.target.checked; renderRack(); };
+    Array.prototype.forEach.call($('rack').querySelectorAll('.rk'), function (b) {
+      b.onclick = function () { rack.sel = b.getAttribute('data-rc'); renderRack(); };
+    });
+  }
 
   // ---------------------------------------------------------------- finishing
   $('finish').onclick = function () {
@@ -200,5 +356,5 @@
     }).then(function () { $('send').disabled = false; $('send').textContent = 'Send email and finish'; });
   };
   $('skip').onclick = function () { done(false); };
-  $('reopen').onclick = function () { finished = null; pane('scan-pane'); renderAll(); $('scan').focus(); };
+  $('reopen').onclick = function () { finished = null; pane('scan-pane'); renderAll(); renderRack(); $('scan').focus(); };
 })();
