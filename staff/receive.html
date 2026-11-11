@@ -18,6 +18,23 @@
   .scanbox { height: 56px; font-size: 20px; font-family: 'IBM Plex Mono', monospace; }
   .ev .mono { font-size: 12px; opacity: .7; }
   .title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+  /* rack photo */
+  .rack-grid { display: grid; gap: 5px; max-width: 760px; }
+  .rk { aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0;
+    font: 500 10px 'IBM Plex Mono', monospace; border: 2px solid var(--line); background: #fff; color: var(--ink2); cursor: pointer; }
+  .rk-empty { border-style: dashed; background: var(--bg); color: var(--muted); }
+  .rk-exp { border-color: var(--primary); color: var(--primary); }
+  .rk-have { border-color: var(--primary); background: var(--good-bg); color: var(--good); }
+  .rk-not { border-color: var(--bad); border-style: dashed; color: var(--bad); }
+  .rk-ok { background: var(--good-bg); border-color: var(--good); color: var(--good); }
+  .rk-dup { background: var(--warn-bg); border-color: #C99700; color: var(--mid); }
+  .rk-other { background: #FBE3DB; border-color: var(--bad); color: var(--bad); }
+  .rk.sel { outline: 3px solid var(--gold); outline-offset: 1px; }
+  .rk-bar { height: 6px; background: var(--line2); border-radius: 3px; overflow: hidden; }
+  .rk-bar span { display: block; height: 100%; width: 0; background: var(--primary); transition: width .2s; }
+  .rk-key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink2); }
+  .rk-key i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid; vertical-align: -2px; margin-right: 6px; }
+  @media (max-width: 600px) { .rk { font-size: 0; } .rack-grid { gap: 3px; } }
   @media (max-width: 1000px) {
     .recv { grid-template-columns: minmax(0, 1fr); }
     .recv .side { order: -1; }
@@ -61,6 +78,9 @@
       <div id="b-note" class="hidden"></div>
       <div id="hold" class="hold hidden" role="status"></div>
 
+      <!-- one photo of a whole rack -->
+      <section id="rack" class="card pad stack hidden" aria-label="Rack photo" aria-live="polite"></section>
+
       <div class="recv">
         <section class="card" aria-label="Expected TSUs">
           <div class="tbl-head exp-grid"><span>Tag</span><span>TSU</span><span class="opt">EID</span><span class="opt">Sex · born</span><span>Status</span></div>
@@ -75,6 +95,12 @@
               <input id="scan" class="field scanbox" placeholder="Ready for scanner…" autocomplete="off">
               <div class="row"><button type="button" class="btn btn-ghost btn-sm" id="scan-go">Add</button>
                 <button type="button" class="btn btn-ghost btn-sm hidden" id="scan-cam">Scan with camera</button></div>
+            </section>
+            <section class="card pad stack-s" aria-label="Check in a whole rack">
+              <b style="font-size:14px">A whole rack at once</b>
+              <span class="small muted">Photograph the bottoms of the vials in their rack. The page reads every code in the photo.</span>
+              <div class="row"><button type="button" class="btn btn-ghost btn-sm" id="rack-btn">Check in a rack from a photo</button></div>
+              <input type="file" id="rack-file" accept="image/*" class="hidden" aria-label="Rack photo">
             </section>
             <section class="card pad stack-s" aria-label="Recent scans" aria-live="polite">
               <span class="eyebrow" style="font-size:12px">Recent scans</span>
@@ -124,6 +150,7 @@
 <script src="../assets/js/config.js"></script>
 <script src="../assets/js/common.js"></script>
 <script src="../assets/js/scanner.js"></script>
+<script src="../assets/js/rackscan.js"></script>
 <script src="../assets/js/staff.js"></script>
 <script src="../assets/js/receive.js"></script>
 </body>
