@@ -22,7 +22,9 @@
   .rack-grid { display: grid; gap: 5px; max-width: 760px; }
   .rk { aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0;
     font: 500 10px 'IBM Plex Mono', monospace; border: 2px solid var(--line); background: #fff; color: var(--ink2); cursor: pointer; }
-  .rk-empty { border-style: dashed; background: var(--bg); color: var(--muted); }
+  .rk-empty { border-color: var(--line); background: var(--bg); cursor: default; }
+  .rk-unread { border-style: dashed; border-color: #C99700; background: #fff; color: var(--mid); font-size: 13px; font-weight: 700; }
+  .rk-lab { display: flex; align-items: center; justify-content: center; font: 600 11px 'Public Sans', sans-serif; color: var(--muted); }
   .rk-exp { border-color: var(--primary); color: var(--primary); }
   .rk-have { border-color: var(--primary); background: var(--good-bg); color: var(--good); }
   .rk-not { border-color: var(--bad); border-style: dashed; color: var(--bad); }
@@ -34,7 +36,7 @@
   .rk-bar span { display: block; height: 100%; width: 0; background: var(--primary); transition: width .2s; }
   .rk-key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink2); }
   .rk-key i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid; vertical-align: -2px; margin-right: 6px; }
-  @media (max-width: 600px) { .rk { font-size: 0; } .rack-grid { gap: 3px; } }
+  @media (max-width: 600px) { .rk { font-size: 0; } .rk-unread { font-size: 11px; } .rack-grid { gap: 3px; } .rk-lab { font-size: 10px; } }
   @media (max-width: 1000px) {
     .recv { grid-template-columns: minmax(0, 1fr); }
     .recv .side { order: -1; }
