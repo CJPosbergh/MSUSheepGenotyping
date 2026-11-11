@@ -146,7 +146,7 @@
   $('scan-cam').onclick = function () { Scanner.open(scan, { keepOpen: true, prompt: 'Point the camera at each TSU barcode in turn' }); };
 
   // ---------------------------------------------------------------- a whole rack from one photo
-  // rack = { phase: reading|preview|saving|done|error, msg, frac, read (RackScan result), out: { tsu: server result }, mirror, sel }
+  // rack = { phase: reading|preview|saving|done|error, msg, frac, read (RackScan result), out: { tsu: server result }, sel, corner }
   var rack = null;
   var RK_TIPS = 'Fill the photo with the rack, hold the phone flat and steady under it, use soft light with no flash, and tap the screen to focus.';
 
@@ -159,7 +159,7 @@
   function busyRack() { return rack && (rack.phase === 'reading' || rack.phase === 'saving'); }
 
   function readRack(file) {
-    rack = { phase: 'reading', msg: 'Opening the photo…', frac: 0, read: null, out: {}, mirror: false, sel: null };
+    rack = { phase: 'reading', msg: 'Opening the photo…', frac: 0, read: null, out: {}, sel: null, corner: corner() };
     renderRack();
     $('rack').scrollIntoView({ behavior: 'smooth', block: 'start' });
     RackScan.read(file, function (msg, frac) {
@@ -184,7 +184,7 @@
   function checkInRack() {
     var codes = rack.read.codes;
     rack.phase = 'saving'; renderRack();
-    var payload = codes.map(function (c) { return { tsu: c.text, pos: c.row + ',' + c.col }; });
+    var payload = codes.map(function (c) { return { tsu: c.text, pos: rack.read.cols ? wellName(c.row, c.col) : '' }; });
     queue = queue.then(function () {
       return Staff.call('scanRack', { ref: V.ref, tsus: payload }).then(function (d) {
         var tally = { ok: 0, dup: 0, repeat: 0 }, others = {}, unknown = [];
@@ -217,18 +217,39 @@
     });
   }
 
-  function cellState(tsu) {
-    if (!tsu) return ['rk-empty', 'No code read here (an empty well, or a code to scan by hand)'];
+  // Well names. The photo shows the vial bottoms; staff say which corner of the photo holds A1 (remembered on
+  // this device). Numbers 1-12 run along the long side of the rack from that corner, letters A-H along the short side.
+  var CORNERS = { bl: 'bottom left', tl: 'top left', tr: 'top right', br: 'bottom right' };
+  function corner() { try { var c = localStorage.getItem('msuRackA1'); return CORNERS[c] ? c : 'bl'; } catch (e) { return 'bl'; } }
+  function setCorner(c) { try { localStorage.setItem('msuRackA1', c); } catch (e) { /* stays for this visit */ } rack.corner = c; }
+  function wellName(r, c) {
+    var R = rack.read.rows, C = rack.read.cols, k = rack.corner || corner(), left = k[1] === 'l', top = k[0] === 't';
+    var across = C >= R;      // long side across the photo
+    var num = across ? (left ? c + 1 : C - c) : (top ? r + 1 : R - r);
+    var let_ = across ? (top ? r : R - 1 - r) : (left ? c : C - 1 - c);
+    return (let_ >= 0 && let_ < 8 ? 'ABCDEFGH'[let_] : '?') + num;
+  }
+
+  function cellState(tsu, r, c) {
+    var at = wellName(r, c) + ': ';
+    if (!tsu) return ['rk-empty', at + 'empty well'];
+    if (tsu === '?') return ['rk-unread', at + 'a vial is here but its code could not be read. Scan it by hand.'];
     var o = rack.out[tsu];
     if (o) {
-      if (o.result === 'ok') return ['rk-ok', tsu + ': received (' + o.tag + ')'];
-      if (o.result === 'dup' || o.result === 'repeat') return ['rk-dup', tsu + ': already checked in' + (o.tag ? ' (' + o.tag + ')' : '')];
-      if (o.result === 'other') return ['rk-other', tsu + ': belongs to ' + o.belongs + '. Set it aside.'];
-      return ['rk-other', tsu + ': not on any submission. Set it aside.'];
+      if (o.result === 'ok') return ['rk-ok', at + tsu + ' received (' + o.tag + ')'];
+      if (o.result === 'dup' || o.result === 'repeat') return ['rk-dup', at + tsu + ' already checked in' + (o.tag ? ' (' + o.tag + ')' : '')];
+      if (o.result === 'other') return ['rk-other', at + tsu + ' belongs to ' + o.belongs + '. Set it aside.'];
+      return ['rk-other', at + tsu + ' is not on any submission. Set it aside.'];
     }
     var e = V.expected.filter(function (x) { return x.tsu === tsu; })[0];
-    if (!e) return ['rk-not', tsu + ': not on this ' + (V.kind === 'replacement' ? 'replacement' : 'submission')];
-    return e.received ? ['rk-have', tsu + ': already checked in (' + e.tag + ')'] : ['rk-exp', tsu + ': ' + e.tag + ', on this box'];
+    if (!e) return ['rk-not', at + tsu + ' is not on this ' + (V.kind === 'replacement' ? 'replacement' : 'submission')];
+    return e.received ? ['rk-have', at + tsu + ' already checked in (' + e.tag + ')'] : ['rk-exp', at + tsu + ' (' + e.tag + ') is on this box'];
+  }
+
+  function unreadWells() {
+    var out = [], cells = rack.read.cells;
+    cells.forEach(function (row, r) { row.forEach(function (t, c) { if (t === '?') out.push(wellName(r, c)); }); });
+    return out.sort(function (a, b) { return a[0] === b[0] ? +a.slice(1) - +b.slice(1) : a < b ? -1 : 1; });
   }
 
   function renderRack() {
@@ -247,39 +268,50 @@
         '<div class="row"><button type="button" class="btn btn-primary btn-sm" id="rk-again">Try another photo</button></div>';
       box.innerHTML = h; wireRack(); return;
     }
-    var r = rack.read, cells = r.cells, empty = 0;
-    cells.forEach(function (row) { row.forEach(function (t) { if (!t) empty++; }); });
+    if (!rack.corner) rack.corner = corner();
+    var r = rack.read, cells = r.cells, unread = r.cols ? unreadWells() : [], vials = r.codes.length + unread.length;
     var onBox = r.codes.filter(function (c) { return V.expected.some(function (e) { return e.tsu === c.text; }); }).length;
+    var byHand = unread.length ? '<b>' + unread.length + ' vial' + (unread.length === 1 ? '' : 's') + ' could not be read</b> (marked ?): scan by hand: ' + unread.join(', ') : '';
     if (rack.phase === 'preview' || rack.phase === 'saving') {
-      h += '<p style="margin:0"><b>Read ' + r.codes.length + ' code' + (r.codes.length === 1 ? '' : 's') + '</b> in ' + r.seconds + ' s: ' +
-        onBox + ' on this box' + (r.codes.length - onBox ? ', <b>' + (r.codes.length - onBox) + ' not on this box</b>' : '') + '.' +
-        (empty ? ' ' + empty + ' position' + (empty === 1 ? '' : 's') + ' had no readable code.' : '') + '</p>';
-      if (r.cols && (r.codes.length < 0.5 * r.rows * r.cols || r.codes.length < 12) && r.codes.length > 1) h += '<div class="alert info"><span>Fewer codes than expected? ' + RK_TIPS + '</span></div>';
+      h += '<p style="margin:0"><b>Read ' + r.codes.length + (unread.length ? ' of ' + vials + ' vials' : ' code' + (r.codes.length === 1 ? '' : 's')) + '</b> in ' + r.seconds + ' s: ' +
+        onBox + ' on this box' + (r.codes.length - onBox ? ', <b>' + (r.codes.length - onBox) + ' not on this box</b>' : '') + '.</p>';
+      if (byHand) h += '<p style="margin:0">' + byHand + '. Or retake the photo.</p>';
+      if (unread.length > 0.25 * vials) h += '<div class="alert info"><span>Many codes unread? ' + RK_TIPS + '</span></div>';
     } else {
-      var t = rack.tally, nOther = Object.keys(rack.others).reduce(function (a, k) { return a + rack.others[k].tsus.length; }, 0);
+      var t = rack.tally;
       var items = ['<li><b>' + t.ok + '</b> checked in</li>'];
       if (t.dup) items.push('<li>' + t.dup + ' were already checked in</li>');
       Object.keys(rack.others).forEach(function (k) { var o = rack.others[k]; var many = o.tsus.length > 1; items.push('<li><b>' + o.tsus.length + ' belong' + (many ? '' : 's') + ' to ' + esc(o.belongs) + '</b>: set ' + (many ? 'them' : 'it') + ' aside (red)</li>'); });
       if (rack.unknown.length) items.push('<li><b>' + rack.unknown.length + ' not on any submission</b>: set aside (red)</li>');
-      if (empty) items.push('<li>' + empty + ' position' + (empty === 1 ? '' : 's') + ' with no code read (dashed): if a vial is there, scan it by hand</li>');
+      if (byHand) items.push('<li>' + byHand + '</li>');
       var left = missing().length;
       items.push('<li>' + (left ? left + ' TSU' + (left === 1 ? '' : 's') + ' on this box still not checked in' : 'Every TSU on this box is checked in') + '</li>');
       h += '<ul style="margin:0;padding-left:18px" class="stack-s">' + items.join('') + '</ul>';
     }
     if (r.cols) {
-      h += '<div class="rack-grid" role="grid" aria-label="Rack positions" style="grid-template-columns:repeat(' + r.cols + ',minmax(0,1fr));max-width:' + Math.min(760, r.cols * 62) + 'px">';
-      for (var a = 0; a < r.rows; a++) for (var b = 0; b < r.cols; b++) {
-        var col = rack.mirror ? r.cols - 1 - b : b, tsu = cells[a][col], st = cellState(tsu);
-        h += '<button type="button" class="rk ' + st[0] + (rack.sel === a + ',' + col ? ' sel' : '') + '" data-rc="' + a + ',' + col + '" title="' + esc(st[1]) + '" aria-label="' + esc(st[1]) + '">' + (tsu ? esc(tsu.slice(-3)) : '') + '</button>';
+      // the grid as in the photo, with row letters and column numbers from the A1 corner
+      var across = r.cols >= r.rows, labelCell = function (txt) { return '<span class="rk-lab">' + txt + '</span>'; };
+      h += '<div class="rack-grid" role="grid" aria-label="Rack positions" style="grid-template-columns:22px repeat(' + r.cols + ',minmax(0,1fr));max-width:' + Math.min(782, 22 + r.cols * 62) + 'px">';
+      h += labelCell('');
+      for (var b0 = 0; b0 < r.cols; b0++) { var nm = wellName(0, b0); h += labelCell(across ? nm.slice(1) : nm[0]); }
+      for (var a = 0; a < r.rows; a++) {
+        var rn = wellName(a, 0); h += labelCell(across ? rn[0] : rn.slice(1));
+        for (var b = 0; b < r.cols; b++) {
+          var tsu = cells[a][b], st = cellState(tsu, a, b);
+          h += '<button type="button" class="rk ' + st[0] + (rack.sel === a + ',' + b ? ' sel' : '') + '" data-rc="' + a + ',' + b + '" title="' + esc(st[1]) + '" aria-label="' + esc(st[1]) + '">' +
+            (tsu === '?' ? '?' : tsu ? esc(tsu.slice(-3)) : '') + '</button>';
+        }
       }
       h += '</div>';
-      var selT = rack.sel ? cells[+rack.sel.split(',')[0]][+rack.sel.split(',')[1]] : undefined;
-      h += '<span class="small" id="rk-sel">' + (rack.sel ? esc(cellState(selT)[1]) : 'Tap a position to see its TSU.') + '</span>';
+      var sel = rack.sel ? rack.sel.split(',').map(Number) : null;
+      h += '<span class="small" id="rk-sel">' + (sel ? esc(cellState(cells[sel[0]][sel[1]], sel[0], sel[1])[1]) : 'Tap a position to see its TSU.') + '</span>';
       h += '<div class="rk-key">' + (rack.phase === 'done'
         ? '<span><i style="border-color:var(--good);background:var(--good-bg)"></i>Checked in</span><span><i style="border-color:#C99700;background:var(--warn-bg)"></i>Already in</span><span><i style="border-color:var(--bad);background:#FBE3DB"></i>Set aside</span>'
         : '<span><i style="border-color:var(--primary)"></i>On this box</span><span><i style="border-color:var(--bad);border-style:dashed"></i>Not on this box</span>') +
-        '<span><i style="border-color:var(--line);border-style:dashed;background:var(--bg)"></i>No code read</span></div>';
-      h += '<label class="check small"><input type="checkbox" id="rk-mirror"' + (rack.mirror ? ' checked' : '') + '> Show as seen from above (the photo shows the bottoms, so left and right are swapped)</label>';
+        '<span><i style="border-color:#C99700;border-style:dashed"></i>? Unread vial</span><span><i style="border-color:var(--line);background:var(--bg)"></i>Empty well</span></div>';
+      h += '<label class="small" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Well A1 is at the <select id="rk-corner" class="field" style="width:auto;padding:4px 8px;font-size:14px">' +
+        Object.keys(CORNERS).map(function (k) { return '<option value="' + k + '"' + (rack.corner === k ? ' selected' : '') + '>' + CORNERS[k] + '</option>'; }).join('') +
+        '</select> of the photo</label>';
     }
     if (rack.err && rack.phase === 'preview') h += '<div class="alert bad"><span>' + esc(rack.err) + '</span></div>';
     if (rack.phase === 'preview') h += '<div class="row"><button type="button" class="btn btn-primary" id="rk-go">Check in ' + r.codes.length + ' TSU' + (r.codes.length === 1 ? '' : 's') + '</button>' +
@@ -294,7 +326,7 @@
     if ($('rk-close')) $('rk-close').onclick = function () { rack = null; renderRack(); $('scan').focus(); };
     if ($('rk-again')) $('rk-again').onclick = function () { $('rack-file').click(); };
     if ($('rk-go')) $('rk-go').onclick = function () { rack.err = ''; checkInRack(); };
-    if ($('rk-mirror')) $('rk-mirror').onchange = function (e) { rack.mirror = e.target.checked; renderRack(); };
+    if ($('rk-corner')) $('rk-corner').onchange = function (e) { setCorner(e.target.value); renderRack(); };
     Array.prototype.forEach.call($('rack').querySelectorAll('.rk'), function (b) {
       b.onclick = function () { rack.sel = b.getAttribute('data-rc'); renderRack(); };
     });

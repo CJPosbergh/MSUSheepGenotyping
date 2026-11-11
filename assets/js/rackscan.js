@@ -4,8 +4,8 @@
    looks again, one rack position at a time, wherever the grid says a code should be but none was read.
 
    RackScan.read(file, onProgress) -> Promise of
-     { codes: [{ text, row, col }], rows, cols, cells: [[text or null]], seconds }
-   rows/cols describe the grid as it appears in the photo, turned so the long side runs across. */
+     { codes: [{ text, row, col }], rows, cols, cells: [[TSU, '?' (vial, code unread) or null (empty well)]], unread, seconds }
+   rows/cols describe the grid as it appears in the photo (top to bottom, left to right). */
 (function () {
   'use strict';
 
@@ -18,9 +18,55 @@
   var OPTS = { formats: ['DataMatrix'], tryHarder: true, tryRotate: true, tryInvert: true, tryDownscale: true, maxNumberOfSymbols: 0 };
   var CELL = { formats: ['DataMatrix'], tryHarder: true, tryRotate: true, tryInvert: true, tryDownscale: true, maxNumberOfSymbols: 1 };
   // Ways to look at one rack position, cheapest first: as is, enlarged, enlarged and smoothed, plain threshold
-  var CELL_TRIES = [{ up: 1, opts: CELL }, { up: 2, opts: CELL }, { up: 2, opts: Object.assign({}, CELL, { tryDenoise: true }) },
-    { up: 2, opts: Object.assign({}, CELL, { binarizer: 'FixedThreshold' }) }, { up: 2, opts: CELL, stretch: true },
-    { up: 3, opts: Object.assign({}, CELL, { tryDenoise: true }), stretch: true }];
+  // Ways to look at one rack position, cheapest first. TSU codes are marked as separate dots, grey on white, so
+  // the later tries widen the view (vials sit off-centre in their wells), boost contrast, and smear or thicken
+  // the dots into solid squares before reading.
+  var DENOISE = Object.assign({}, CELL, { tryDenoise: true }), NOINV = Object.assign({}, CELL, { tryInvert: false });
+  var CELL_TRIES = [
+    { up: 1, side: 1.1, opts: CELL },
+    { up: 2, side: 1.1, opts: CELL },
+    { up: 2, side: 1.3, opts: DENOISE, prep: ['stretch'] },
+    { up: 2, side: 1.1, opts: NOINV, prep: ['stretch', 'blur2', 'stretch'] },
+    { up: 3, side: 1.1, opts: NOINV, prep: ['stretch', 'thicken4', 'stretch'] },
+    { up: 2, side: 1.1, opts: DENOISE },
+    { up: 2, side: 1.3, opts: NOINV, prep: ['stretch', 'blur2', 'stretch'] },
+    { up: 2, side: 1.1, opts: Object.assign({}, CELL, { binarizer: 'FixedThreshold' }) },
+    { up: 2, side: 1.1, opts: CELL, prep: ['stretch'] },
+    { up: 3, side: 1.1, opts: DENOISE, prep: ['stretch'] },
+    { up: 3, side: 1.3, opts: DENOISE, prep: ['stretch'] }
+  ];
+  function prep(img, steps) {
+    (steps || []).forEach(function (st) {
+      if (st === 'stretch') stretch(img);
+      else if (st.indexOf('blur') === 0) boxBlur(img, +st.slice(4));
+      else if (st.indexOf('thicken') === 0) darkest(img, +st.slice(7));
+    });
+    return img;
+  }
+  /** Box blur of radius r (grey result): joins neighbouring dots. */
+  function boxBlur(img, r) {
+    var w = img.width, h = img.height, s = img.data, t = new Float32Array(w * h), o = new Float32Array(w * h), x, y, acc, n;
+    for (var i = 0; i < w * h; i++) t[i] = s[i * 4] * 0.3 + s[i * 4 + 1] * 0.59 + s[i * 4 + 2] * 0.11;
+    for (y = 0; y < h; y++) for (acc = 0, n = 0, x = -r; x < w; x++) {
+      if (x + r < w) { acc += t[y * w + x + r]; n++; }
+      if (x - r - 1 >= 0) { acc -= t[y * w + x - r - 1]; n--; }
+      if (x >= 0) o[y * w + x] = acc / n;
+    }
+    for (x = 0; x < w; x++) for (acc = 0, n = 0, y = -r; y < h; y++) {
+      if (y + r < h) { acc += o[(y + r) * w + x]; n++; }
+      if (y - r - 1 >= 0) { acc -= o[(y - r - 1) * w + x]; n--; }
+      if (y >= 0) t[y * w + x] = acc / n;
+    }
+    for (i = 0; i < w * h; i++) s[i * 4] = s[i * 4 + 1] = s[i * 4 + 2] = t[i];
+  }
+  /** Each pixel takes the darkest value within r: grows the dark dots until they touch. */
+  function darkest(img, r) {
+    var w = img.width, h = img.height, s = img.data, t = new Uint8ClampedArray(w * h), o = new Uint8ClampedArray(w * h), x, y, k, m;
+    for (var i = 0; i < w * h; i++) t[i] = s[i * 4] * 0.3 + s[i * 4 + 1] * 0.59 + s[i * 4 + 2] * 0.11;
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) { for (m = 255, k = Math.max(0, x - r); k <= Math.min(w - 1, x + r); k++) if (t[y * w + k] < m) m = t[y * w + k]; o[y * w + x] = m; }
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) { for (m = 255, k = Math.max(0, y - r); k <= Math.min(h - 1, y + r); k++) if (o[k * w + x] < m) m = o[k * w + x]; t[y * w + x] = m; }
+    for (i = 0; i < w * h; i++) s[i * 4] = s[i * 4 + 1] = s[i * 4 + 2] = t[i];
+  }
 
   /** Contrast stretch on the middle of a crop (washed out by glare, or dim): 5th to 95th percentile -> 0..255. */
   function stretch(img) {
@@ -155,51 +201,113 @@
         if (codes.length >= 6) return;
         return sweep(600, 2, 0.55, 0.75, 'Looking closer… section');
       }).then(function () {
-        // Pass 2: work out the grid, then look again wherever a code should be
-        var g = grid(codes, W, H);
+        // Pass 2: work out the grid, find every vial (read or not), then look again at each unread vial
+        var g = grid(codes);
         if (!g) return finish(null);
-        var todo = g.todo, k = 0;
+        var rad = Math.max(3, g.pitch * 0.22);
+        function look(r, c) {          // brightness, texture and colour around a rack position (null outside the photo)
+          var p = g.toImage(r, c), x = Math.round(p.x - rad), y = Math.round(p.y - rad), sz = Math.round(rad * 2);
+          if (x < 0 || y < 0 || x + sz > W || y + sz > H) return null;
+          var d = fctx.getImageData(x, y, sz, sz).data, n = d.length / 4, m = 0, m2 = 0, sat = 0;
+          for (var q = 0; q < d.length; q += 4) {
+            var L = d[q] * 0.3 + d[q + 1] * 0.59 + d[q + 2] * 0.11;
+            m += L; m2 += L * L; sat += Math.max(d[q], d[q + 1], d[q + 2]) - Math.min(d[q], d[q + 1], d[q + 2]);
+          }
+          m /= n;
+          return { L: m, sd: Math.sqrt(Math.max(0, m2 / n - m * m)), sat: sat / n };
+        }
+        // A vial bottom looks like the ones that were read: about as bright, as grey and as speckled with code.
+        // An empty well is dark; the rack frame is coloured or smooth.
+        var ref = g.rc.map(function (p) { return look(p[0], p[1]); }).filter(Boolean);
+        var refL = median(ref.map(function (v) { return v.L; })), refSd = median(ref.map(function (v) { return v.sd; }));
+        var refSat = median(ref.map(function (v) { return v.sat; }));
+        var seen = {};
+        function vial(r, c) {
+          var key = r + ',' + c;
+          if (!(key in seen)) {
+            var v = look(r, c);
+            seen[key] = !!v && v.L >= refL * 0.72 && v.sd >= refSd * 0.45 && v.sat <= Math.max(45, refSat * 2);
+          }
+          return seen[key];
+        }
+        // Grow towards whole edge rows/columns of vials that were not read (a standard rack is 8 x 12)
+        var ra = 0, rb = g.R - 1, ca = 0, cb = g.C - 1;
+        var wantR = g.C >= g.R ? 8 : 12, wantC = g.C >= g.R ? 12 : 8;
+        function lineScore(isRow, idx) {
+          var hits = 0;
+          if (isRow) { for (var c = ca; c <= cb; c++) if (vial(idx, c)) hits++; }
+          else { for (var r = ra; r <= rb; r++) if (vial(r, idx)) hits++; }
+          return hits;
+        }
+        for (var t = 0; t < 8 && rb - ra + 1 < wantR; t++) {
+          var up = lineScore(true, ra - 1), dn = lineScore(true, rb + 1);
+          if (!up && !dn) break;
+          if (up >= dn) ra--; else rb++;
+        }
+        for (t = 0; t < 8 && cb - ca + 1 < wantC; t++) {
+          var lf = lineScore(false, ca - 1), rt = lineScore(false, cb + 1);
+          if (!lf && !rt) break;
+          if (lf >= rt) ca--; else cb++;
+        }
+        var taken = {};
+        g.rc.forEach(function (p) { taken[p[0] + ',' + p[1]] = true; });
+        var todo = [];
+        for (var rr = ra; rr <= rb; rr++) for (var cc = ca; cc <= cb; cc++) if (!taken[rr + ',' + cc] && vial(rr, cc)) todo.push([rr, cc]);
+        var k = 0;
         function nextCell() {
           if (k >= todo.length) return Promise.resolve();
           var rc = todo[k++];
-          say('Looking again at empty positions… ' + k + ' of ' + todo.length, 0.75 + 0.23 * k / todo.length);
+          say('Looking again at unread vials… ' + k + ' of ' + todo.length, 0.75 + 0.23 * k / todo.length);
           var pt = g.toImage(rc[0], rc[1]);
-          var side = g.pitch * 1.1, base = Math.max(1, 200 / side);
+          var base = Math.max(1, 200 / (g.pitch * 1.1));
           var n = 0;
           function attempt() {
             if (n >= CELL_TRIES.length) return Promise.resolve();
-            var tr = CELL_TRIES[n++], up = Math.min(4, base * tr.up);
-            var c = crop(pt.x - side / 2, pt.y - side / 2, side, side, up);
-            if (!c) return Promise.resolve();
-            return window.ZXingWASM.readBarcodes(tr.stretch ? stretch(c.data) : c.data, tr.opts).then(function (rs) {
-              if (!(rs[0] && add(rs[0], c.x, c.y, up))) return attempt();
+            var tr = CELL_TRIES[n++], upx = Math.min(4, base * tr.up), side = g.pitch * tr.side;
+            var c = crop(pt.x - side / 2, pt.y - side / 2, side, side, upx);
+            if (!c) return attempt();
+            return window.ZXingWASM.readBarcodes(prep(c.data, tr.prep), tr.opts).then(function (rs) {
+              var hit = rs[0] && place(rs[0], c.x, c.y, upx);
+              // only a code in the middle of the view belongs to this position (not the edge of a neighbour)
+              if (hit && Math.hypot(hit.x - pt.x, hit.y - pt.y) < g.pitch * 0.5 && add(rs[0], c.x, c.y, upx)) { g.rc.push(rc); taken[rc[0] + ',' + rc[1]] = true; return; }
+              return attempt();
             }, attempt);
           }
           return attempt().then(wait).then(nextCell);
         }
-        return nextCell().then(function () { return finish(grid(codes, W, H)); });
+        return nextCell().then(function () {
+          var unread = {};
+          todo.forEach(function (rc) { if (!taken[rc[0] + ',' + rc[1]]) unread[rc[0] + ',' + rc[1]] = true; });
+          return finish({ rc: g.rc, unread: unread, ra: ra, rb: rb, ca: ca, cb: cb, pitch: g.pitch, toImage: g.toImage });
+        });
       });
 
+      /* Grid as it appears in the photo: rows top to bottom, columns left to right.
+         cells[r][c] is a TSU, '?' for a vial whose code could not be read, or null for an empty well. */
       function finish(g) {
         say('Done', 1);
-        var out = { codes: [], rows: 0, cols: 0, cells: [], seconds: Math.round((Date.now() - t0) / 100) / 10 };
+        var out = { codes: [], rows: 0, cols: 0, cells: [], unread: 0, seconds: Math.round((Date.now() - t0) / 100) / 10 };
         if (!g) {
           out.codes = codes.map(function (c) { return { text: c.text, row: 0, col: 0 }; });
           if (codes.length === 1) { out.rows = 1; out.cols = 1; out.cells = [[codes[0].text]]; }
           return out;
         }
-        // Keep only the rows and columns from the first to the last one with a code (edges added for the search may be empty)
-        var at = g.rc;
-        var r0 = Infinity, r1 = -1, c0 = Infinity, c1 = -1;
-        at.forEach(function (rc) { r0 = Math.min(r0, rc[0]); r1 = Math.max(r1, rc[0]); c0 = Math.min(c0, rc[1]); c1 = Math.max(c1, rc[1]); });
-        var R = r1 - r0 + 1, C = c1 - c0 + 1, turn = R > C;   // show the long side across
-        out.rows = turn ? C : R; out.cols = turn ? R : C;
-        for (var a = 0; a < out.rows; a++) { out.cells.push([]); for (var b = 0; b < out.cols; b++) out.cells[a].push(null); }
+        // Drop outer rows/columns with nothing in them (an empty row at the far end of a part-filled rack)
+        var used = function (r, c) { return g.unread[r + ',' + c] || g.rc.some(function (p) { return p[0] === r && p[1] === c; }); };
+        var lineUsed = function (isRow, idx) { for (var q = isRow ? g.ca : g.ra; q <= (isRow ? g.cb : g.rb); q++) if (isRow ? used(idx, q) : used(q, idx)) return true; return false; };
+        while (g.ra < g.rb && !lineUsed(true, g.ra)) g.ra++;
+        while (g.rb > g.ra && !lineUsed(true, g.rb)) g.rb--;
+        while (g.ca < g.cb && !lineUsed(false, g.ca)) g.ca++;
+        while (g.cb > g.ca && !lineUsed(false, g.cb)) g.cb--;
+        out.rows = g.rb - g.ra + 1; out.cols = g.cb - g.ca + 1;
+        for (var a = 0; a < out.rows; a++) { out.cells.push([]); for (var b = 0; b < out.cols; b++) out.cells[a].push(g.unread[(a + g.ra) + ',' + (b + g.ca)] ? '?' : null); }
+        out.unread = Object.keys(g.unread).length;
+        out.unreadAt = Object.keys(g.unread).map(function (k) { var p = k.split(','), q = g.toImage(+p[0], +p[1]); return { row: p[0] - g.ra, col: p[1] - g.ca, x: Math.round(q.x), y: Math.round(q.y) }; });
+        out.pitch = Math.round(g.pitch);
         codes.forEach(function (c, n) {
-          var rc = [at[n][0] - r0, at[n][1] - c0];
-          var row = turn ? rc[1] : rc[0], col = turn ? R - 1 - rc[0] : rc[1];
-          if (out.cells[row][col] === null) out.cells[row][col] = c.text;
-          out.codes.push({ text: c.text, row: row, col: col });
+          var row = g.rc[n][0] - g.ra, col = g.rc[n][1] - g.ca;
+          if (row >= 0 && col >= 0 && row < out.rows && col < out.cols && !(out.cells[row][col] && out.cells[row][col] !== '?')) out.cells[row][col] = c.text;
+          out.codes.push({ text: c.text, row: row, col: col, x: Math.round(c.x), y: Math.round(c.y) });
         });
         return out;
       }
@@ -210,7 +318,7 @@
       code then gets its row and column by stepping from neighbour to neighbour (so a photo taken at a slant,
       where rows are not quite parallel, still lines up), and a perspective fit of row/column to photo
       position says where unread positions are. Returns null with fewer than 2 codes. */
-  function grid(codes, W, H) {
+  function grid(codes) {
     var n = codes.length;
     if (n < 2) return null;
     var nn = [], sx = 0, sy = 0;
@@ -277,18 +385,7 @@
       return { x: mx + a * co - b * si, y: my + a * si + b * co };
     }
 
-    // Positions to look at again: every empty one, plus whole edge rows/columns a standard 8 x 12 rack may still have
-    function inside(r, c) { var p = toImage(r, c); return p.x > pitch * 0.3 && p.y > pitch * 0.3 && p.x < W - pitch * 0.3 && p.y < H - pitch * 0.3; }
-    var wantR = C >= R ? 8 : 12, wantC = C >= R ? 12 : 8, ra = 0, rb = R - 1, ca = 0, cb = C - 1;
-    if (n >= 6) {
-      for (var t = 0; rb - ra + 1 < wantR && t < 8; t++) { if (inside(rb + 1, (ca + cb) / 2)) rb++; else if (inside(ra - 1, (ca + cb) / 2)) ra--; else break; }
-      for (t = 0; cb - ca + 1 < wantC && t < 8; t++) { if (inside((ra + rb) / 2, cb + 1)) cb++; else if (inside((ra + rb) / 2, ca - 1)) ca--; else break; }
-    }
-    var taken = {};
-    rc.forEach(function (p) { taken[p[0] + ',' + p[1]] = true; });
-    var todo = [];
-    for (var rr = ra; rr <= rb; rr++) for (var cc = ca; cc <= cb; cc++) if (!taken[rr + ',' + cc] && inside(rr, cc)) todo.push([rr, cc]);
-    return { rc: rc, pitch: pitch, toImage: toImage, todo: todo };
+    return { rc: rc, R: R, C: C, pitch: pitch, toImage: toImage };
   }
 
   /** Least-squares perspective map from (col, row) to photo position (in thousands of pixels). Needs 6+ codes. */
