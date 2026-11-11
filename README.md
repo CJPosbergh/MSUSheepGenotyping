@@ -5,7 +5,7 @@ The producer genotyping service run by the MSU Sheep Program: producers submit s
 | Part | Where it lives | What it does |
 |---|---|---|
 | Website | This repo, served by GitHub Pages at https://cjposbergh.github.io/MSUSheepGenotyping/ | Submission page, private status/results page, sign, replacement and packing-slip pages, and the two staff pages |
-| Tracker | A Google Sheet | Every producer, submission, animal, batch, result, invoice and email |
+| Tracker | A Google Sheet owned by cposbergh@gmail.com | Every producer, submission, animal, batch, result, invoice and email |
 | Back end | Apps Script bound to the tracker (`apps-script/`) | Answers the website, sends email, makes invoice PDFs, adds the **Genotyping** menu |
 | Results files | R (`r/`) on your computer | Pushes genotype calls and parentage to the tracker, makes each producer's PDF and Excel results |
 | Drive | "MSU Sheep Genotyping" folder in the same account | Uploaded forms, photos, invoices, results files, GenomNZ batch files |
@@ -32,22 +32,22 @@ Submission statuses: Submitted → Received (or On hold) → At lab → Analyzin
 
 ## First-time setup
 
-Do these once, in this order. 
+Do these once, in this order. Everything runs as **cposbergh@gmail.com**.
 
 ### 1. The tracker Sheet
-1. In Google Drive  upload `tracker/MSU_Sheep_Genotyping_Tracker_START.xlsx`, open it, then **File > Save as Google Sheets**. Use the Google Sheets copy from now on and delete the uploaded .xlsx. (`…_EXAMPLE.xlsx` is the same tracker filled with made-up data, for looking around.)
+1. In Google Drive (as cposbergh@gmail.com) upload `tracker/MSU_Sheep_Genotyping_Tracker_START.xlsx`, open it, then **File > Save as Google Sheets**. Use the Google Sheets copy from now on and delete the uploaded .xlsx. (`…_EXAMPLE.xlsx` is the same tracker filled with made-up data, for looking around.)
 2. On the **Settings** tab check every value. In particular:
    - `Staff_Passphrase`: type the staff passphrase here, and only here. The copies of the tracker in this public repo leave it blank on purpose; the staff pages stay locked while it is blank.
-   - `Blank_Submission_Form` and `Paper_Consent_Form`: Drive links. Set both files to **Share > Anyone with the link > Viewer**, or producers can't open them.
+   - `Blank_Submission_Form` and `Paper_Consent_Form`: Drive links. Set both files to **Share > Anyone with the link > Viewer**, or producers can't open them. The blank form uses a direct-download link, `https://drive.google.com/uc?export=download&id=` plus the file ID (the long code in its normal Drive link), so the button downloads the .xlsx instead of opening it in Google Sheets. Keep that file as an uploaded .xlsx: if it's ever converted to a Google Sheet, use `https://docs.google.com/spreadsheets/d/<ID>/export?format=xlsx` instead.
    - `Site_URL`: the GitHub Pages address, ending in `/`. Every link in every email starts with it.
    - `Mailing_Address`, `Dropoff_Location`, `Dropoff_Hours`, `Contact_Email`, `Contact_Phone`, `Checks_Payable_To`: shown on pages, slips, invoices and emails.
    - Leave the `…_Folder_ID`, `…_Template_ID` rows blank: Set up fills them.
-3. Check **Cost_Share**  **Services** (GENO $18, TSU $2.75) and **Conditions** / **Result_Key** (what the tests are and how each call is labelled).
+3. Check **Cost_Share** (CS01 = ASI Fine Wool genotyping, Erika Sanko, esanko@sheepusa.org, through Dec 2027; GR01 is a placeholder for your grant funder), **Services** (GENO $18, TSU $2.75) and **Conditions** / **Result_Key** (what the tests are and how each call is labelled).
 
 ### 2. The Apps Script back end
 1. In the Sheet: **Extensions > Apps Script**. Name the project "MSU Sheep Genotyping".
 2. **Project Settings (gear) > Show "appsscript.json" manifest file in editor**, then replace its contents with `apps-script/appsscript.json`.
-3. For every other file in `apps-script/`, add a file with the same name (**+ > Script** for `.gs`, **+ > HTML** for `Review.html`; the editor adds the extension) and paste the contents in. There are 14 `.gs` files plus `Review.html`. Delete the empty `Code.gs`.
+3. For every other file in `apps-script/`, add a file with the same name (**+ > Script** for `.gs`, **+ > HTML** for `Review.html`; the editor adds the extension) and paste the contents in. There are 13 `.gs` files plus `Review.html`. Delete the empty `Code.gs`.
    Faster alternative if you are comfortable with a terminal: install [clasp](https://github.com/google/clasp) (`npm i -g @google/clasp`), `clasp login`, then in `apps-script/` run `clasp clone <script ID from Project Settings>` once and `clasp push` after every change.
 4. Save, go back to the Sheet and reload it. A **Genotyping** menu appears.
 5. **Genotyping > Set up (folders, templates, reminders)**. Approve the permissions (Google warns the app is unverified because it is yours: **Advanced > Go to MSU Sheep Genotyping**). Set up creates the Drive folders, the invoice and partner-bill Google Docs templates, the daily reminder trigger at 8am, and checks every tab's columns. It is safe to run again.
@@ -66,7 +66,7 @@ Do these once, in this order.
 Submit the blank form filled in with your own email and two made-up animals, sign online, print the slip, receive it on `staff/receive.html`, create and cancel a batch. Then delete your test rows (Producers, Submissions, Animals, Invoices, Invoice_Lines, Email_Log, Batches) and the test folder in Drive/Submissions.
 
 ### 6. R (for results)
-1. `install.packages(c("googlesheets4", "googledrive", "openxlsx", "jsonlite"))`
+1. `install.packages(c("googlesheets4", "googledrive", "openxlsx", "jsonlite", "genio"))`
 2. Install [Quarto](https://quarto.org/docs/get-started/) (you have it; it includes Typst, which draws the PDF). Check with `quarto --version` in a terminal. If R can't find it, set `QUARTO_PATH` in `~/.Renviron` to the full path.
 3. Copy the `r/` folder somewhere handy. In `r/tracker_push.R` set `TRACKER_ID` to the Sheet's URL or ID.
 4. In R: `source("r/tracker_push.R"); source("r/reports.R"); reports_auth()`. The first time a browser opens to sign in as cposbergh@gmail.com; tick every permission box.
@@ -136,17 +136,17 @@ Animals are billed once: `Animals.Billed_On` records the invoice. A sample that 
 
 ## Results in R (PDF and Excel)
 
-After GenomNZ's data arrives and you have called genotypes:
+After GenomNZ's PLINK files arrive:
 
 ```r
-source("r/tracker_push.R"); source("r/reports.R")
+source("r/tracker_push.R"); source("r/reports.R"); source("r/genotype_calls.R")
 reports_auth()
 
-# 1. rename lab sample IDs (TSUs) to Animal_Keys for PLINK, if you need to
-plink_id_files(batch = "B2026-01", prefix = "B2026-01")
-
-# 2. condition calls: data frame with Animal_Key, Condition_ID, Genotype, Call
-push_results(calls, failed = c("P003-01-26007"))   # failed = samples that failed QC
+# 1. condition calls straight from PLINK, for the animals in the batch
+g <- call_conditions("D:/Genotypes/.../GNZ_60K_Sheep_Sept2026", batch = "B2026-01")
+g$qc        # per animal: anything withheld (discordant/missing probes, odd scrapie codons) or failed
+g$probes    # per probe: found? other strand? how often it agrees with its duplicates
+push_results(g$calls, failed = g$failed)
 
 # 3. parentage: Animal_Key, Sire_Result, Dam_Result (+ Sire_Assigned, Dam_Assigned, Notes)
 cands <- candidate_parents(lamb_keys)               # pool of genotyped sires/dams per lamb
@@ -156,15 +156,16 @@ push_parentage(parentage)
 results_reports(batch = "B2026-01")
 ```
 
+- `call_conditions()` reads the **Markers** tab (which chip probes belong to each condition and what each allele means, e.g. `T=+; C=B`) and **Result_Key** (every call a condition can produce). Sample IDs can be Animal_Keys, TSU barcodes or the lab's `batch_well_TSU` IDs; the TSU is looked up on Animals. Samples whose call rate over the whole chip is below 90% (`call_rate_min`) are returned as `failed`. Duplicate probes must agree once translated; no-calls are ignored, and if they disagree or none is called that condition is left off that animal and listed in `g$qc` (the animal isn't failed for it). Scrapie haplotypes are built from codons 136, 154 and 171 (R, H and K probes) and must form a pair of ARR, AHQ, ARH, ARQ, VRQ; OPP diplotypes come from the haplotype 1, 2 and 4 markers (none of them = haplotype 3). It needs the `genio` package.
 - Everything pushed goes in with `Released = N`: producers see nothing yet. Calls must match a row on **Result_Key** (the call-to-label table), or nothing is written and you get a list of problems.
 - `failed` animals get Sample_Status = Failed QC: after release their page asks for a replacement TSU.
 - `results_reports()` writes `reports/<ID>_<Flock>_results.pdf` and `.xlsx` locally, uploads both to the submission's Drive folder (replacing older versions) and fills `Results_PDF` / `Results_Excel`. Use `results_report("P003-01", upload = FALSE)` to just look at one.
-- The PDF lists every **active** condition (Conditions > Active = Y), including ones not shown on the web page (Show_On_Web = N); the Excel file has a Results sheet (one row per animal, every call and parentage result, filterable) and a How to read sheet built from Conditions and Result_Key.
+- The PDF lists every **active** condition (Conditions > Active = Y): those shown on the web page (Show_On_Web = Y, scrapie and OPP) as full columns, the rest in a compact "Other conditions tested" grid; the Excel file has a Results sheet (one row per animal, every call and parentage result, filterable) and a How to read sheet built from Conditions and Result_Key.
 - **Check the files**, then in the Sheet click the submission row and **Genotyping > Release results for selected submission…**. That sets Released = Y, sets the status to Results released, shows results on the producer's page with the download buttons, and sends E08 (or use "Release without emailing").
 - When replacement results come in later: push them, run `results_report()` for that submission again (the files are replaced), and release again.
 - The PDF layout is `r/results_template.typ` (Typst). Wording like "How to read these results" and "What to do next" is there and in `reports.R`; condition explanations come from the Conditions tab.
 
-To add a condition: add a Conditions row (ID, name, gene, Show_On_Web, Active = Y, Sort_Order, Explanation) and one Result_Key row per possible call with its label and category (good / mid / bad = blue / amber / red). The web page, PDF and Excel pick it up.
+To add a condition: add a Conditions row (ID, name, gene, Show_On_Web, Active = Y, Sort_Order, Explanation), one Result_Key row per possible call with its label and category (good / mid / bad = blue / amber / red; leave blank for a neutral grey, as for production and colour traits), and its probes on the Markers tab with an Allele_Code mapping each allele to a letter of the call. The calls, web page, PDF and Excel pick it up without code changes. Call letters are matched in either order (`DF` or `FD`), so write the Result_Key call however you like.
 
 ---
 
@@ -192,7 +193,7 @@ To add a condition: add a Conditions row (ID, name, gene, Show_On_Web, Active = 
 
 ```
 apps-script/      back end: paste into the Sheet's Apps Script project (Schema.gs and Validate.gs are generated)
-assets/           css, js (one file per page + shared common.js, staff.js, scanner.js, validate.js), vendor libraries, GenomNZ template
+assets/           css, js (one file per page + shared common.js, staff.js, scanner.js, rackscan.js, validate.js), vendor libraries, GenomNZ template
 staff/            receiving and batches pages
 r/                tracker_push.R, reports.R, results_template.typ, logo.svg, tests
 tracker/          START (blank) and EXAMPLE trackers
@@ -205,12 +206,13 @@ Tests run the real Apps Script code against a copy of the tracker with Google's 
 
 ```
 npm install
-npm test                          # 140 back-end checks, then 62 browser checks (Chromium via Playwright)
+npm test                          # 147 back-end checks, then 64 browser checks (Chromium via Playwright)
 Rscript r/tests/test_reports.R    # 18 checks of the R reports (PDF needs Quarto)
+Rscript r/tests/test_genotype_calls.R   # 20 checks of the PLINK condition calls on a made-up data set
 npm run serve                     # the whole site on http://localhost:8080 with a mock back end (staff passphrase: test)
 ```
 
-After adding or renaming tracker columns, regenerate `apps-script/Schema.gs` from the tracker builder's schema export (`python3 tools/gen_schema.py tracker_schema.json`), paste it into Apps Script and run **Check tracker columns**. Libraries in `assets/vendor/` (SheetJS, ExcelJS, qrcode-generator) are bundled so the site works without other CDNs.
+After adding or renaming tracker columns, regenerate `apps-script/Schema.gs` from the tracker builder's schema export (`python3 tools/gen_schema.py tracker_schema.json`), paste it into Apps Script and run **Check tracker columns**. Libraries in `assets/vendor/` (SheetJS, ExcelJS, qrcode-generator, and the zxing-wasm barcode reader used for rack photos) are bundled so the site works without other CDNs. The reader's `zxing_reader.wasm` (about 1 MB) loads only when someone checks in a rack.
 
 ---
 
@@ -226,4 +228,7 @@ After adding or renaming tracker columns, regenerate `apps-script/Schema.gs` fro
 | A producer's form is rejected | The page lists each problem by row. Common ones: EIDs shown as 8.40003E+14 (format the column as Text and retype), the EXAMPLE row left in, a TSU used before. |
 | Reminders stopped | Apps Script > Triggers: `dailyReminders` should be there; run Set up to add it back. |
 | The camera button is missing on a phone | Camera scanning needs Chrome or Edge (Android, Windows, Mac). On iPhone, use a Bluetooth scanner or type the barcode. |
+| "The server did not answer properly (404)" but the row was saved | Google sometimes loses the reply to a request that did run. The pages retry automatically with the same request ID, and the back end hands back the saved answer instead of saving twice. If it still shows, the producer's confirmation email arrives anyway, and pressing Submit again for the same file is safe. |
+| "Cannot read properties of undefined" or "unexpected answer" on a page | The page got Google's health-check reply instead of the real one (Apps Script > Executions shows a `doGet` run at that moment). The pages now reject such answers and retry; if it keeps happening, check `assets/js/config.js` holds the `/exec` URL exactly as Deploy shows it. |
+| Pages are slow (several seconds) | Each page asks the Apps Script, which reads the Sheet; the first request after a quiet spell also has to wake Google's server. The code reads each tab once per request and keeps small tabs (Settings, Conditions, Result_Key, Services, Cost_Share, Email_Templates) cached for 10 minutes; editing one of those tabs by hand clears its cache at once. A status page usually takes 1–3 s, a submission 5–15 s (it also creates the Drive folder, saves the form and sends the email). Apps Script > Executions shows each request's duration. |
 | A "Something went wrong on our side" error | Apps Script > Executions shows the error and which action caused it. |
