@@ -5,7 +5,7 @@ The producer genotyping service run by the MSU Sheep Program: producers submit s
 | Part | Where it lives | What it does |
 |---|---|---|
 | Website | This repo, served by GitHub Pages at https://cjposbergh.github.io/MSUSheepGenotyping/ | Submission page, private status/results page, sign, replacement and packing-slip pages, and the two staff pages |
-| Tracker | A Google Sheet owned by cposbergh@gmail.com | Every producer, submission, animal, batch, result, invoice and email |
+| Tracker | A Google Sheet owned | Every producer, submission, animal, batch, result, invoice and email |
 | Back end | Apps Script bound to the tracker (`apps-script/`) | Answers the website, sends email, makes invoice PDFs, adds the **Genotyping** menu |
 | Results files | R (`r/`) on your computer | Pushes genotype calls and parentage to the tracker, makes each producer's PDF and Excel results |
 | Drive | "MSU Sheep Genotyping" folder in the same account | Uploaded forms, photos, invoices, results files, GenomNZ batch files |
@@ -32,10 +32,10 @@ Submission statuses: Submitted → Received (or On hold) → At lab → Analyzin
 
 ## First-time setup
 
-Do these once, in this order. Everything runs as **cposbergh@gmail.com**.
+Do these once, in this order. Everything runs as .
 
 ### 1. The tracker Sheet
-1. In Google Drive (as cposbergh@gmail.com) upload `tracker/MSU_Sheep_Genotyping_Tracker_START.xlsx`, open it, then **File > Save as Google Sheets**. Use the Google Sheets copy from now on and delete the uploaded .xlsx. (`…_EXAMPLE.xlsx` is the same tracker filled with made-up data, for looking around.)
+1. In Google Drive (as ) upload `tracker/MSU_Sheep_Genotyping_Tracker_START.xlsx`, open it, then **File > Save as Google Sheets**. Use the Google Sheets copy from now on and delete the uploaded .xlsx. (`…_EXAMPLE.xlsx` is the same tracker filled with made-up data, for looking around.)
 2. On the **Settings** tab check every value. In particular:
    - `Staff_Passphrase`: type the staff passphrase here, and only here. The copies of the tracker in this public repo leave it blank on purpose; the staff pages stay locked while it is blank.
    - `Blank_Submission_Form` and `Paper_Consent_Form`: Drive links. Set both files to **Share > Anyone with the link > Viewer**, or producers can't open them. The blank form uses a direct-download link, `https://drive.google.com/uc?export=download&id=` plus the file ID (the long code in its normal Drive link), so the button downloads the .xlsx instead of opening it in Google Sheets. Keep that file as an uploaded .xlsx: if it's ever converted to a Google Sheet, use `https://docs.google.com/spreadsheets/d/<ID>/export?format=xlsx` instead.
@@ -69,7 +69,7 @@ Submit the blank form filled in with your own email and two made-up animals, sig
 1. `install.packages(c("googlesheets4", "googledrive", "openxlsx", "jsonlite", "genio"))`
 2. Install [Quarto](https://quarto.org/docs/get-started/) (you have it; it includes Typst, which draws the PDF). Check with `quarto --version` in a terminal. If R can't find it, set `QUARTO_PATH` in `~/.Renviron` to the full path.
 3. Copy the `r/` folder somewhere handy. In `r/tracker_push.R` set `TRACKER_ID` to the Sheet's URL or ID.
-4. In R: `source("r/tracker_push.R"); source("r/reports.R"); reports_auth()`. The first time a browser opens to sign in as cposbergh@gmail.com; tick every permission box.
+4. In R: `source("r/tracker_push.R"); source("r/reports.R"); reports_auth()`. The first time a browser opens to sign in as ; tick every permission box.
 
 ---
 
