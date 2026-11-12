@@ -219,6 +219,7 @@
 
   // Well names. The photo shows the vial bottoms; staff say which corner of the photo holds A1 (remembered on
   // this device). Numbers 1-12 run along the long side of the rack from that corner, letters A-H along the short side.
+  // The page always draws the standard plate map (A1 top left, H12 bottom right), whatever way the photo was taken.
   var CORNERS = { bl: 'bottom left', tl: 'top left', tr: 'top right', br: 'bottom right' };
   function corner() { try { var c = localStorage.getItem('msuRackA1'); return CORNERS[c] ? c : 'bl'; } catch (e) { return 'bl'; } }
   function setCorner(c) { try { localStorage.setItem('msuRackA1', c); } catch (e) { /* stays for this visit */ } rack.corner = c; }
@@ -230,8 +231,22 @@
     return (let_ >= 0 && let_ < 8 ? 'ABCDEFGH'[let_] : '?') + num;
   }
 
-  function cellState(tsu, r, c) {
-    var at = wellName(r, c) + ': ';
+  /** What sits in each well of the 96-well plate: { A1: TSU or '?' }, plus codes that fall outside A1-H12. */
+  function plateMap() {
+    var map = {}, outside = [];
+    rack.read.cells.forEach(function (row, r) {
+      row.forEach(function (t, c) {
+        if (!t) return;
+        var w = wellName(r, c), num = +w.slice(1);
+        if (w[0] === '?' || num < 1 || num > 12) { if (t !== '?') outside.push(t); return; }
+        map[w] = t;
+      });
+    });
+    return { map: map, outside: outside };
+  }
+
+  function cellState(tsu, well) {
+    var at = well + ': ';
     if (!tsu) return ['rk-empty', at + 'empty well'];
     if (tsu === '?') return ['rk-unread', at + 'a vial is here but its code could not be read. Scan it by hand.'];
     var o = rack.out[tsu];
@@ -269,7 +284,7 @@
       box.innerHTML = h; wireRack(); return;
     }
     if (!rack.corner) rack.corner = corner();
-    var r = rack.read, cells = r.cells, unread = r.cols ? unreadWells() : [], vials = r.codes.length + unread.length;
+    var r = rack.read, unread = r.cols ? unreadWells() : [], vials = r.codes.length + unread.length;
     var onBox = r.codes.filter(function (c) { return V.expected.some(function (e) { return e.tsu === c.text; }); }).length;
     var byHand = unread.length ? '<b>' + unread.length + ' vial' + (unread.length === 1 ? '' : 's') + ' could not be read</b> (marked ?): scan by hand: ' + unread.join(', ') : '';
     if (rack.phase === 'preview' || rack.phase === 'saving') {
@@ -289,22 +304,22 @@
       h += '<ul style="margin:0;padding-left:18px" class="stack-s">' + items.join('') + '</ul>';
     }
     if (r.cols) {
-      // the grid as in the photo, with row letters and column numbers from the A1 corner
-      var across = r.cols >= r.rows, labelCell = function (txt) { return '<span class="rk-lab">' + txt + '</span>'; };
-      h += '<div class="rack-grid" role="grid" aria-label="Rack positions" style="grid-template-columns:22px repeat(' + r.cols + ',minmax(0,1fr));max-width:' + Math.min(782, 22 + r.cols * 62) + 'px">';
+      // The standard plate map, A1 top left to H12 bottom right, whichever way the rack was photographed
+      var pm = plateMap(), LET = 'ABCDEFGH', labelCell = function (txt) { return '<span class="rk-lab">' + txt + '</span>'; };
+      h += '<div class="rack-grid" role="grid" aria-label="96-well plate map" style="grid-template-columns:22px repeat(12,minmax(0,1fr));max-width:766px">';
       h += labelCell('');
-      for (var b0 = 0; b0 < r.cols; b0++) { var nm = wellName(0, b0); h += labelCell(across ? nm.slice(1) : nm[0]); }
-      for (var a = 0; a < r.rows; a++) {
-        var rn = wellName(a, 0); h += labelCell(across ? rn[0] : rn.slice(1));
-        for (var b = 0; b < r.cols; b++) {
-          var tsu = cells[a][b], st = cellState(tsu, a, b);
-          h += '<button type="button" class="rk ' + st[0] + (rack.sel === a + ',' + b ? ' sel' : '') + '" data-rc="' + a + ',' + b + '" title="' + esc(st[1]) + '" aria-label="' + esc(st[1]) + '">' +
+      for (var n0 = 1; n0 <= 12; n0++) h += labelCell(n0);
+      for (var a = 0; a < 8; a++) {
+        h += labelCell(LET[a]);
+        for (var b = 1; b <= 12; b++) {
+          var well = LET[a] + b, tsu = pm.map[well] || null, st = cellState(tsu, well);
+          h += '<button type="button" class="rk ' + st[0] + (rack.sel === well ? ' sel' : '') + '" data-well="' + well + '" title="' + esc(st[1]) + '" aria-label="' + esc(st[1]) + '">' +
             (tsu === '?' ? '?' : tsu ? esc(tsu.slice(-3)) : '') + '</button>';
         }
       }
       h += '</div>';
-      var sel = rack.sel ? rack.sel.split(',').map(Number) : null;
-      h += '<span class="small" id="rk-sel">' + (sel ? esc(cellState(cells[sel[0]][sel[1]], sel[0], sel[1])[1]) : 'Tap a position to see its TSU.') + '</span>';
+      h += '<span class="small" id="rk-sel">' + (rack.sel ? esc(cellState(pm.map[rack.sel] || null, rack.sel)[1]) : 'Tap a well to see its TSU.') + '</span>';
+      if (pm.outside.length) h += '<div class="alert warn"><span>' + pm.outside.length + ' code' + (pm.outside.length === 1 ? '' : 's') + ' fell outside a 96-well layout (' + esc(pm.outside.join(', ')) + '). Check which corner of the photo holds A1, or retake the photo square on.</span></div>';
       h += '<div class="rk-key">' + (rack.phase === 'done'
         ? '<span><i style="border-color:var(--good);background:var(--good-bg)"></i>Checked in</span><span><i style="border-color:#C99700;background:var(--warn-bg)"></i>Already in</span><span><i style="border-color:var(--bad);background:#FBE3DB"></i>Set aside</span>'
         : '<span><i style="border-color:var(--primary)"></i>On this box</span><span><i style="border-color:var(--bad);border-style:dashed"></i>Not on this box</span>') +
@@ -326,9 +341,9 @@
     if ($('rk-close')) $('rk-close').onclick = function () { rack = null; renderRack(); $('scan').focus(); };
     if ($('rk-again')) $('rk-again').onclick = function () { $('rack-file').click(); };
     if ($('rk-go')) $('rk-go').onclick = function () { rack.err = ''; checkInRack(); };
-    if ($('rk-corner')) $('rk-corner').onchange = function (e) { setCorner(e.target.value); renderRack(); };
+    if ($('rk-corner')) $('rk-corner').onchange = function (e) { setCorner(e.target.value); rack.sel = null; renderRack(); };
     Array.prototype.forEach.call($('rack').querySelectorAll('.rk'), function (b) {
-      b.onclick = function () { rack.sel = b.getAttribute('data-rc'); renderRack(); };
+      b.onclick = function () { rack.sel = b.getAttribute('data-well'); renderRack(); };
     });
   }
 
